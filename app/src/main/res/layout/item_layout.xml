@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/item_text"
+        android:layout_width="70dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="16dp"
+        android:textSize="16sp" />
+
+    <EditText
+        android:id="@+id/etNumber"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:hint="Сон"
+        android:maxLength="3"
+        android:inputType="date" />
+
+    <Button
+        android:id="@+id/btn_num"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:text="Ok" />
+
+    <TextView
+        android:id="@+id/item_text_itog"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="16dp"
+        android:text="Хеч нарса йўқ"
+        android:textSize="16sp" />
+<!--    <TextView-->
+<!--        android:id="@+id/item_text_plus"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_marginStart="16dp"-->
+<!--        android:text="Х"-->
+<!--        android:textSize="16sp" />-->
+</LinearLayout>
