@@ -1,20 +1,18 @@
 package com.example.hisob;
 
-import static java.lang.String.*;
-
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.SharedPreferences;
 
+import android.graphics.Color;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -24,23 +22,29 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
+// Бунинг ёрдамида ҳар бир `etNumber` қийматини йиғамиз
 public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder> {
-    private Context context;
-    private int currentSum, newSum;
+    DbSQL dbSQL;
     private List<ItemModel> itemList;
+    private Context context;
 
-    // Ҳар бир фойдаланувчи учун қўшилган рақамлар рўйхати
-    private Map<String, List<Integer>> userNumbersMap = new HashMap<>();
+    // Интерфейс орқали маълумотни топшириш
+    public interface OnSubmitClickListener {
+        void onSubmitClicked(Map<Integer, Integer> numberMap);
+    }
 
-    public ItemAdapter(List<ItemModel> itemList, Context context) {
-        this.itemList = itemList;
+    private OnSubmitClickListener listener;
+
+    public void setOnSubmitClickListener(OnSubmitClickListener listener) {
+        this.listener = listener;
+    }
+
+    public ItemAdapter(Context context, List<ItemModel> itemList) {
         this.context = context;
-
-        // Ҳар бир фойдаланувчи учун бошланғич рўйхат
-        for (ItemModel item : itemList) {
-            userNumbersMap.put(item.getName(), new ArrayList<>());
-        }
+        this.itemList = itemList;
+        dbSQL = new DbSQL(context);
     }
 
     @NonNull
@@ -50,101 +54,120 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         return new ItemViewHolder(view);
     }
 
+    @SuppressLint("SetTextI18n")
     @Override
     public void onBindViewHolder(@NonNull ItemViewHolder holder, @SuppressLint("RecyclerView") int position) {
         ItemModel item = itemList.get(position);
 
-       holder.textView.setText(item.getName());
+        // Стандарт ҳолатларни аниқлаш
+        holder.etNumber.setVisibility(View.VISIBLE);
+        holder.item_text_itog.setTextColor(Color.BLACK);
+        holder.item_text_itog.setText(String.valueOf(item.getAmountplus()));
+        holder.etNumber.setText("");
 
-        holder.item_text_itog.setText(valueOf(item.getAmount()));
-       Log.d("demo1", "adapter " + item.getAmount());
+        // Қийматларни текшириш
+        int amount = Integer.parseInt(item.getAmount());
 
+        if (amount <= 0) {
+            holder.item_text_itog.setTextColor(Color.BLUE);
+        } else if (amount == 107) {
+            holder.item_text_itog.setTextColor(Color.BLUE);
+            dbSQL.updateNull(String.valueOf(item.getId()), "0", "0");
+            holder.item_text_itog.setText(item.getName() + " жон сизда омадли 107, сизда ҳозир 0");
+        } else if (amount >= 108) {
+            holder.etNumber.setVisibility(View.GONE);
+            holder.item_text_itog.setTextColor(Color.RED);
+            holder.item_text_itog.setText(item.getName() + " жон сиз учдингиз. Ҳисобингиз " + amount);
+        } else {
+            holder.item_text_itog.setTextColor(Color.BLACK);
+        }
 
-        SharedPreferences preferences = context.getSharedPreferences("UserSums", Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
+        // `etNumber` матнини тинглаш
+        holder.etNumber.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-        // Рақамни киритиш
-        holder.btn_num.setOnClickListener(v -> {
-            String numberStr = holder.etNumber.getText().toString().trim();
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
-            if(numberStr.equals("-") || numberStr.equals("--") || numberStr.equals("/") || numberStr.equals("//") || numberStr.equals(".") || numberStr.equals("..")) {
-                Log.d("demo1", "sss: ");
-                Toast.makeText(v.getContext(), "Рақам киритинг", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            if(numberStr.equals("7.")) {
-                holder.item_text_itog.setText(item.getName() + "жон, сиз учдингиз: ");
-                holder.etNumber.setVisibility(View.GONE);
-                holder.etNumber.setText("");
-                return;
-            }
-
-            if (!numberStr.isEmpty() ) {
-                int number = Integer.parseInt(numberStr);
-
-                // Жорий йиғиндиси
-                currentSum = preferences.getInt(item.getName(), 0);
-                newSum = currentSum + number;
-
-                // Янгиланган йиғиндисини сақлаш
-                editor.putInt(item.getName(), newSum);
-                editor.apply();
-
-                List<Integer> numbers = userNumbersMap.get(item.getName());
-                if (numbers == null) {
-                    // Агар рўйхат мавжуд бўлмаса, янгисини яратиш
-                    numbers = new ArrayList<>();
-                    userNumbersMap.put(item.getName(), numbers);
+            @Override
+            public void afterTextChanged(Editable s) {
+                String numberStr = s.toString().trim();
+                if (!numberStr.isEmpty() && isNumeric(numberStr)) {
+                    int inputNumber = Integer.parseInt(numberStr);
+                    if (inputNumber == -77) {
+                        holder.etNumber.setVisibility(View.GONE);
+                        holder.item_text_itog.setTextColor(Color.RED);
+                        holder.item_text_itog.setText(item.getName() + " жон сиз учдингиз қўлингизда бахтсиз 7");
+                    }
                 }
-                numbers.add(number);
-
-                // Қўшилган рақамларни кўрсатиш
-                StringBuilder numberList = new StringBuilder();
-                for (int num : numbers) {
-                    numberList.append(num).append("+");
-                }
-
-                // Охирги "+" белгисини олиб ташлаш
-                if (numberList.length() > 0) {
-                    numberList.setLength(numberList.length() - 1);
-                }
-
-
-
-
-                // Хусусий ҳолатлар учун хабар кўрсатиш
-                if (newSum >= 108) {
-                    Log.d("demo1", "Сиз учдингиз: " + newSum);
-                    holder.item_text_itog.setText(item.getName() + "жон, сиз учдингиз: " + numberList + "=" + newSum);
-                    holder.etNumber.setVisibility(View.GONE);
-                } else if (newSum == 107) {
-                    editor.putInt(item.getName(), 0);
-                    editor.apply();
-                    holder.item_text_itog.setText(item.getName() + "жон, омадлисиз! Сизда 0");
-                } else {
-                    holder.item_text_itog.setText(numberList + "=" + newSum);
-                }
-//                itemList.add(new ItemModel(item.getName(), newSum));
-                // Киритилган рақамни тозалаш
-                holder.etNumber.setText("");
             }
         });
 
-        // Фойдаланувчини ўчириш
+        // Ўчириш функцияси қолади
         holder.textView.setOnClickListener(v -> {
             new AlertDialog.Builder(context)
                     .setTitle("Ўчириш")
                     .setMessage(item.getName() + " маълумотини ўчиришга ишончингиз комилми?")
                     .setPositiveButton("Ҳа", (dialog, which) -> {
-                        itemList.remove(position);
-                        userNumbersMap.remove(item.getName()); // Рақамлар рўйхатини ўчириш
-                        notifyItemRemoved(position);
-                        notifyItemRangeChanged(position, itemList.size());
+                        dbSQL.deleteSelect(String.valueOf(item.getId()));
+                        Refresh(dbSQL.readCourses());
                     })
                     .setNegativeButton("Йўқ", null)
                     .show();
         });
+
+        holder.etNumber.setFilters(new InputFilter[]{
+                (source, start, end, dest, dstart, dend) -> {
+                    // Фақат манфий ёки рақамлар қабул қилинади
+                    if (source.toString().matches("^-?\\d*$")) {
+                        return null; // Қабул қилинади
+                    }
+                    return ""; // Қабул қилинмайди
+                }
+        });
+
+
+    }
+
+    // Ёрдамчи метод: Қиймат тўғри ёзилганини текшириш
+    private boolean isValidNumber(String str) {
+        if (str.equals("-")) {
+            return false; // Фақат "минус" киритилган бўлса, нотўғри деб қаралади
+        }
+
+        try {
+            Integer.parseInt(str); // Мусбат ёки манфий сонни текшириш
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    // Барча EditText'ларни тозалаш
+    public void clearAllInputs() {
+        for (ItemModel item : itemList) {
+            item.setTemporaryAmount(0);
+
+        }
+        notifyDataSetChanged();
+    }
+
+    // Ёрдамчи метод: Сон ёки йўқлигини текшириш
+    private boolean isNumeric(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    void Refresh(ArrayList<ItemModel> events) {
+        itemList.clear();
+        itemList.addAll(events);
+        notifyDataSetChanged();
+
     }
 
     @Override
@@ -152,19 +175,25 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         return itemList.size();
     }
 
-    public static class ItemViewHolder extends RecyclerView.ViewHolder {
+    public Map<Integer, Integer> collectAllNumbers() {
+        Map<Integer, Integer> numberMap = new HashMap<>();
+        for (ItemModel item : itemList) {
+            numberMap.put(item.getId(), item.getTemporaryAmount());
 
-        TextView textView, item_text_itog, item_text_plus;
-        Button btn_num;
+        }
+        return numberMap;
+    }
+
+    public static class ItemViewHolder extends RecyclerView.ViewHolder {
+        TextView textView, item_text_itog;
         EditText etNumber;
 
         public ItemViewHolder(@NonNull View itemView) {
             super(itemView);
-            btn_num = itemView.findViewById(R.id.btn_num);
             textView = itemView.findViewById(R.id.item_text);
-            etNumber = itemView.findViewById(R.id.etNumber);
             item_text_itog = itemView.findViewById(R.id.item_text_itog);
-//            item_text_plus = itemView.findViewById(R.id.item_text_plus);
+            etNumber = itemView.findViewById(R.id.etNumber);
         }
     }
 }
+

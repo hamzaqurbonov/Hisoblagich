@@ -23,16 +23,18 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Scanner;
 
 public class MainActivity extends AppCompatActivity {
+    DbSQL dbSQL;
     Spinner spinner, spinner_young;
     private EditText etNumber, edit_add_name;
     private Button btnAdd, btnClear, btnname, btn_num;
     private TextView tvResult;
 
     // Фойдаланувчи исмлари учун массив
-    private String[] users = {"Акмал", "Азиз", "Бекзод", "Хамза", "Иномжон"};
+//    private String[] users = {"Акмал", "Азиз", "Бекзод", "Хамза", "Иномжон"};
 
     ArrayList<ItemModel> list = new ArrayList<>();
     private int currentUserIndex = 0; // Жорий фойдаланувчи индекси
@@ -48,6 +50,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        dbSQL = new DbSQL(this);
+        etNumber = findViewById(R.id.etNumber);
         item_recycler = findViewById(R.id.item_recycler);
         spinner_young = findViewById(R.id.spinner_young);
         btnClear = findViewById(R.id.btnClear);
@@ -60,29 +64,34 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = preferences.edit();
 
 
+        list = dbSQL.readCourses();
+        adapter = new ItemAdapter( MainActivity.this, list );
+        item_recycler.setLayoutManager(new LinearLayoutManager(this));
+        item_recycler.setAdapter(adapter);
 
         btnClear.setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("Ўчириш")
-                    .setMessage( "Маълумотини ўчириб янгидан бошлашга ишончингиз комилми?")
-                    .setPositiveButton("Ҳа", (dialog, which) -> {
-                        editor.clear();
-                        editor.apply();
-                        adapter = new ItemAdapter(list, this);
-                        item_recycler.setLayoutManager(new LinearLayoutManager(this));
-                        item_recycler.setAdapter(adapter);
-                    })
-                    .setNegativeButton("Йўқ", null)
-                    .show();
+            Map<Integer, Integer> numberMap = adapter.collectAllNumbers();
+            for (Map.Entry<Integer, Integer> entry : numberMap.entrySet()) {
+                int id = entry.getKey();
+                int amount = entry.getValue();
+
+                // Киритилган қийматни `SQL`га жойлаш
+                dbSQL.updateCourse(String.valueOf(id), amount);
+
+            }
+
+            // Барча `EditText` қийматини тозалаш
+            adapter.clearAllInputs();
+
+            // Маълумотларни янгилаш
+            Refresh(dbSQL.readCourses());
         });
 
-
         btnname.setOnClickListener(v -> {
-
-
-            list.add( new ItemModel(emploee, preferences.getInt(emploee, 0)));
+            dbSQL.addNewCourse(emploee,"0", "0");
+            list = dbSQL.readCourses();
         Log.d("demo1", "activityllist " + preferences.getInt(emploee, 0));
-            adapter = new ItemAdapter(list, this);
+            adapter = new  ItemAdapter( MainActivity.this, list );
             item_recycler.setLayoutManager(new LinearLayoutManager(this));
             item_recycler.setAdapter(adapter);
 //            edit_add_name.setText("");
@@ -108,6 +117,11 @@ public class MainActivity extends AppCompatActivity {
                 // Танланган элементни олиш
                 String selectedOption = parentView.getItemAtPosition(position).toString();
                 emploee = selectedOption;
+
+
+                adapter = new  ItemAdapter( MainActivity.this, list );
+                item_recycler.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+                item_recycler.setAdapter(adapter);
             }
 
             @Override
@@ -115,6 +129,13 @@ public class MainActivity extends AppCompatActivity {
                 // Хеч нарса танланмаса (ўрнатилган ҳолат)
             }
         });
+    }
+
+
+    void Refresh(ArrayList<ItemModel> events) {
+        list.clear();
+        list.addAll(events);
+        adapter.notifyDataSetChanged();
     }
 
 }
