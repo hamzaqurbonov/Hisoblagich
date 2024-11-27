@@ -58,31 +58,33 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
     @Override
     public void onBindViewHolder(@NonNull ItemViewHolder holder, @SuppressLint("RecyclerView") int position) {
         ItemModel item = itemList.get(position);
+        String inputText = holder.etNumber.getText().toString().trim();
 
-        // Стандарт ҳолатларни аниқлаш
         holder.etNumber.setVisibility(View.VISIBLE);
         holder.item_text_itog.setTextColor(Color.BLACK);
+        holder.textView.setText(item.getName());
         holder.item_text_itog.setText(String.valueOf(item.getAmountplus()));
         holder.etNumber.setText("");
 
-        // Қийматларни текшириш
         int amount = Integer.parseInt(item.getAmount());
 
         if (amount <= 0) {
             holder.item_text_itog.setTextColor(Color.BLUE);
+        } else if ((amount == 100) || (amount == 101) || (amount == 102) || (amount == 103) || (amount == 104) || (amount == 105 || (amount == 106))) {
+            holder.item_text_itog.setTextColor(Color.RED);
         } else if (amount == 107) {
             holder.item_text_itog.setTextColor(Color.BLUE);
             dbSQL.updateNull(String.valueOf(item.getId()), "0", "0");
-            holder.item_text_itog.setText(item.getName() + " жон сизда омадли 107, сизда ҳозир 0");
+            holder.item_text_itog.setText(item.getName() + "жон сизда омадли 107, сизда хозир 0");
         } else if (amount >= 108) {
             holder.etNumber.setVisibility(View.GONE);
             holder.item_text_itog.setTextColor(Color.RED);
-            holder.item_text_itog.setText(item.getName() + " жон сиз учдингиз. Ҳисобингиз " + amount);
+            holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз. Ҳисобингиз " + item.getAmount());
         } else {
             holder.item_text_itog.setTextColor(Color.BLACK);
         }
 
-        // `etNumber` матнини тинглаш
+        // Ҳар бир EditText учун киритилган қийматни оламиз
         holder.etNumber.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -94,15 +96,36 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
             public void afterTextChanged(Editable s) {
                 String numberStr = s.toString().trim();
                 if (!numberStr.isEmpty() && isNumeric(numberStr)) {
+                    item.setTemporaryAmount(Integer.parseInt(numberStr));
+                } else {
+                    item.setTemporaryAmount(0); // Нотўғри ёки бўш қиймат учун 0 сақланади
+                }
+                if (!numberStr.isEmpty() && isNumeric(numberStr)) {
                     int inputNumber = Integer.parseInt(numberStr);
                     if (inputNumber == -77) {
                         holder.etNumber.setVisibility(View.GONE);
                         holder.item_text_itog.setTextColor(Color.RED);
-                        holder.item_text_itog.setText(item.getName() + " жон сиз учдингиз қўлингизда бахтсиз 7");
+                        holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлингизда бахтсиз 7");
                     }
                 }
+
             }
+
         });
+
+        if (!inputText.isEmpty()) {
+            try {
+                if (inputText.equals("-77")) {
+                    holder.etNumber.setVisibility(View.GONE);
+                    holder.item_text_itog.setTextColor(Color.RED);
+                    holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлизда бахтсиз 7");
+                } else {
+                }
+            } catch (NumberFormatException e) {
+            }
+        } else {
+            holder.item_text_itog.setTextColor(Color.BLACK);
+        }
 
         // Ўчириш функцияси қолади
         holder.textView.setOnClickListener(v -> {
