@@ -36,7 +36,16 @@
         android:id="@+id/btnname"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Фойдаланувчи қўшиш" />
+        android:text="Фойдаланувчи қўшиш"
+        android:backgroundTint="#C1E8FF"
+        android:textColor="#106013"
+        android:textStyle="bold"
+        android:shadowColor="#009688"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:shadowRadius="0"
+        android:layout_margin="0dp"
+        android:elevation="8dp"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/item_recycler"
@@ -48,6 +57,16 @@
         android:id="@+id/btnClear"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Ҳисоблаш" />
+        android:textStyle="bold"
+        android:textColor="@color/purple_500"
+        android:backgroundTint="@color/white"
+        android:text="Ҳисоблаш"
+        android:shadowColor="#55000000"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:shadowRadius="0"
+        android:layout_margin="0dp"
+        android:elevation="8dp"
+        />
 
 </LinearLayout>
