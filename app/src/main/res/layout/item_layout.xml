@@ -5,9 +5,14 @@
     android:orientation="horizontal"
     android:padding="8dp">
 
+<!--    <ImageView-->
+<!--        android:id="@+id/delete_select"-->
+<!--        android:layout_width="25dp"-->
+<!--        android:layout_height="25dp"-->
+<!--        android:src="@drawable/delete_24px" />-->
     <TextView
         android:id="@+id/item_text"
-        android:layout_width="70dp"
+        android:layout_width="82dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:layout_marginStart="16dp"
@@ -19,13 +24,14 @@
         android:layout_height="50dp"
         android:hint="Сон"
         android:maxLength="3"
-        android:inputType="date" />
+        android:digits="0123456789-."
+        android:inputType="text"/>
 
-    <Button
-        android:id="@+id/btn_num"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:text="Ok" />
+<!--    <Button-->
+<!--        android:id="@+id/btn_num"-->
+<!--        android:layout_width="40dp"-->
+<!--        android:layout_height="40dp"-->
+<!--        android:text="Ok" />-->
 
     <TextView
         android:id="@+id/item_text_itog"

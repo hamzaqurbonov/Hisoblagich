@@ -9,6 +9,7 @@ import android.widget.Adapter;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -32,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText etNumber, edit_add_name;
     private Button btnAdd, btnClear, btnname, btn_num;
     private TextView tvResult;
+    ImageView delete_all;
 
     // Фойдаланувчи исмлари учун массив
 //    private String[] users = {"Акмал", "Азиз", "Бекзод", "Хамза", "Иномжон"};
@@ -57,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         btnClear = findViewById(R.id.btnClear);
         btnname = findViewById(R.id.btnname);
 
-        btn_num = findViewById(R.id.btn_num);
+        delete_all = findViewById(R.id.delete_all);
 
         // SharedPreferences инициализацияси
         SharedPreferences preferences = getSharedPreferences("UserSums", Context.MODE_PRIVATE);
@@ -98,6 +100,18 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
+
+        delete_all.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Ўчириш")
+                    .setMessage("Барчасини ўчиришга ишончингиз комилми?")
+                    .setPositiveButton("Ҳа", (dialog, which) -> {
+                        dbSQL.deleteAllData();
+                        Refresh(dbSQL.readCourses());
+                    })
+                    .setNegativeButton("Йўқ", null)
+                    .show();
+        });
         spinner_young();
 
 

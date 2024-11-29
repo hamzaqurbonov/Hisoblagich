@@ -66,23 +66,33 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         holder.item_text_itog.setText(String.valueOf(item.getAmountplus()));
         holder.etNumber.setText("");
 
-        int amount = Integer.parseInt(item.getAmount());
 
-        if (amount <= 0) {
+        int amount = Integer.parseInt(item.getAmount());
+        Log.d("demo2", "onBindViewHolder: " + item.getName() +amount);
+        if (amount <= 40) {
             holder.item_text_itog.setTextColor(Color.BLUE);
-        } else if ((amount == 100) || (amount == 101) || (amount == 102) || (amount == 103) || (amount == 104) || (amount == 105 || (amount == 106))) {
+        }
+        if ((amount == 100) || (amount == 101) || (amount == 102) || (amount == 103) || (amount == 104) || (amount == 105 || (amount == 106))) {
             holder.item_text_itog.setTextColor(Color.RED);
-        } else if (amount == 107) {
+        }
+        if (amount == 107) {
             holder.item_text_itog.setTextColor(Color.BLUE);
             dbSQL.updateNull(String.valueOf(item.getId()), "0", "0");
             holder.item_text_itog.setText(item.getName() + "жон сизда омадли 107, сизда хозир 0");
-        } else if (amount >= 108) {
+        }
+        if (amount >= 108) {
             holder.etNumber.setVisibility(View.GONE);
             holder.item_text_itog.setTextColor(Color.RED);
             holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз. Ҳисобингиз " + item.getAmount());
-        } else {
-            holder.item_text_itog.setTextColor(Color.BLACK);
         }
+        if (amount <= -400) {
+            holder.etNumber.setVisibility(View.GONE);
+            holder.item_text_itog.setTextColor(Color.RED);
+            holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлингизда бахтсиз 7");
+        }
+//        else {
+//            holder.item_text_itog.setTextColor(Color.BLACK);
+//        }
 
         // Ҳар бир EditText учун киритилган қийматни оламиз
         holder.etNumber.addTextChangedListener(new TextWatcher() {
@@ -106,6 +116,7 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
                         holder.etNumber.setVisibility(View.GONE);
                         holder.item_text_itog.setTextColor(Color.RED);
                         holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлингизда бахтсиз 7");
+                        dbSQL.updateNull(String.valueOf(item.getId()), "-777", "0");
                     }
                 }
 
@@ -113,19 +124,17 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
 
         });
 
-        if (!inputText.isEmpty()) {
-            try {
-                if (inputText.equals("-77")) {
-                    holder.etNumber.setVisibility(View.GONE);
-                    holder.item_text_itog.setTextColor(Color.RED);
-                    holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлизда бахтсиз 7");
-                } else {
-                }
-            } catch (NumberFormatException e) {
-            }
-        } else {
-            holder.item_text_itog.setTextColor(Color.BLACK);
-        }
+//        if (!inputText.isEmpty()) {
+//            try {
+//                if (inputText.equals("-77")) {
+//                    holder.etNumber.setVisibility(View.GONE);
+//                    holder.item_text_itog.setTextColor(Color.RED);
+//                    holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлизда бахтсиз 7");
+//                } else {
+//                }
+//            } catch (NumberFormatException e) {
+//            }
+//        }
 
         // Ўчириш функцияси қолади
         holder.textView.setOnClickListener(v -> {

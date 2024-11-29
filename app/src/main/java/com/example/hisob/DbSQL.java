@@ -118,17 +118,22 @@ public class DbSQL extends SQLiteOpenHelper {
             do {
                 int id = Integer.parseInt(cursorCourses.getString(0));
                 String name = cursorCourses.getString(1);
-                String amoun = cursorCourses.getString(2);
+                String amount = cursorCourses.getString(2);
                 String amountplus = cursorCourses.getString(3);
-//                courseModalArrayList.add(new HistoryModel(
-//                        cursorCourses.getString(1),
-//                        cursorCourses.getString(2)
-//                ));
 
-                courseModalArrayList.add(new ItemModel(id, name, amoun, amountplus));
+                courseModalArrayList.add(new ItemModel(id, name, amount, amountplus));
             } while (cursorCourses.moveToNext());
         }
         cursorCourses.close();
+
+        courseModalArrayList.sort((item1, item2) -> {
+            // `amount`ни сонга айлантириб муқоиса қиламиз
+            int amount1 = Integer.parseInt(item1.getAmount());
+            int amount2 = Integer.parseInt(item2.getAmount());
+            return Integer.compare(amount2, amount1); // Каттадан кичикка
+        });
+
+
         return courseModalArrayList;
     }
 
@@ -142,6 +147,8 @@ public class DbSQL extends SQLiteOpenHelper {
     public  void deleteAllData(){
         SQLiteDatabase db = this.getWritableDatabase();
         db.execSQL("DELETE FROM " + TABLE_NAME);
+        db.execSQL("DELETE FROM sqlite_sequence WHERE name='" + TABLE_NAME + "'");
+
     }
 
 
