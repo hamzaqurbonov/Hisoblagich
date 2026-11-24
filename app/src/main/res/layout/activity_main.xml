@@ -1,72 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<LinearLayout
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:background="#F8F9FA">
 
+    <!-- Top Action Bar -->
     <LinearLayout
+        android:id="@+id/header_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="56dp"
+        android:layout_alignParentTop="true"
+        android:background="#1976D2"
+        android:elevation="4dp"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
 
-        <Spinner
-            android:id="@+id/spinner_young"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/tvHeaderTitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"/>
+            android:layout_weight="1"
+            android:text="Карта 108"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
 
-        <LinearLayout
-            android:layout_width="120dp"
-            android:layout_height="25dp"/>
         <ImageView
             android:id="@+id/delete_all"
-            android:layout_width="50dp"
-            android:layout_height="25dp"
-            android:layout_marginEnd="5dp"
-            android:src="@drawable/delete_24px" />
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/delete_24px"
+            app:tint="#FFFFFF" />
     </LinearLayout>
 
-    <Button
-        android:id="@+id/btnname"
+    <!-- Main Content Container (above Bottom Navigation) -->
+    <FrameLayout
+        android:id="@+id/container_main"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Фойдаланувчи қўшиш"
-        android:backgroundTint="#C1E8FF"
-        android:textColor="#106013"
-        android:textStyle="bold"
-        android:shadowColor="#009688"
-        android:shadowDx="0"
-        android:shadowDy="0"
-        android:shadowRadius="0"
-        android:layout_margin="0dp"
-        android:elevation="8dp"/>
+        android:layout_height="match_parent"
+        android:layout_below="@id/header_bar"
+        android:layout_above="@id/bottom_navigation">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/item_recycler"
+        <!-- SECTION 1: HISOB (ACTIVE GAME) -->
+        <LinearLayout
+            android:id="@+id/layout_hisob"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="4dp">
+
+                <Spinner
+                    android:id="@+id/spinner_young"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@android:drawable/btn_dropdown"/>
+
+                <Button
+                    android:id="@+id/btnname"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:text="+ Қўшиш"
+                    android:textColor="#FFFFFF"
+                    android:backgroundTint="#1976D2"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/item_recycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:paddingTop="8dp"
+                android:clipToPadding="false" />
+
+            <Button
+                android:id="@+id/btnClear"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_margin="16dp"
+                android:text="ҲИСОБЛАШ"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#4CAF50"
+                android:elevation="6dp"
+                app:cornerRadius="12dp" />
+        </LinearLayout>
+
+        <!-- SECTION 2: HISTORY -->
+        <LinearLayout
+            android:id="@+id/layout_history"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📜 Ўтказилган Ўйинлар Тарихи"
+                android:textColor="#212121"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:padding="16dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvGameHistory"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"/>
+        </LinearLayout>
+
+        <!-- SECTION 3: STATISTICS -->
+        <LinearLayout
+            android:id="@+id/layout_stat"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🏆 Ўйинчилар Статистикаси"
+                android:textColor="#212121"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:padding="16dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvStatistics"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp"/>
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Bottom Navigation Bar -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/relativeLayout"
-        tools:layout_editor_absoluteX="6dp" />
-    <Button
-        android:id="@+id/btnClear"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textStyle="bold"
-        android:textColor="@color/purple_500"
-        android:backgroundTint="@color/white"
-        android:text="Ҳисоблаш"
-        android:shadowColor="#55000000"
-        android:shadowDx="0"
-        android:shadowDy="0"
-        android:shadowRadius="0"
-        android:layout_margin="0dp"
+        android:layout_height="60dp"
+        android:layout_alignParentBottom="true"
+        android:background="#FFFFFF"
         android:elevation="8dp"
-        />
+        app:menu="@menu/bottom_menu"
+        app:itemIconTint="@color/bottom_nav_color"
+        app:itemTextColor="@color/bottom_nav_color"/>
 
-</LinearLayout>
+</RelativeLayout>

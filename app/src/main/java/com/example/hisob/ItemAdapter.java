@@ -2,16 +2,15 @@ package com.example.hisob;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-
 import android.graphics.Color;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -22,24 +21,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-// Бунинг ёрдамида ҳар бир `etNumber` қийматини йиғамиз
 public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder> {
-    DbSQL dbSQL;
+    private DbSQL dbSQL;
     private List<ItemModel> itemList;
     private Context context;
-
-    // Интерфейс орқали маълумотни топшириш
-    public interface OnSubmitClickListener {
-        void onSubmitClicked(Map<Integer, Integer> numberMap);
-    }
-
-    private OnSubmitClickListener listener;
-
-    public void setOnSubmitClickListener(OnSubmitClickListener listener) {
-        this.listener = listener;
-    }
 
     public ItemAdapter(Context context, List<ItemModel> itemList) {
         this.context = context;
@@ -56,45 +42,57 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
 
     @SuppressLint("SetTextI18n")
     @Override
-    public void onBindViewHolder(@NonNull ItemViewHolder holder, @SuppressLint("RecyclerView") int position) {
+    public void onBindViewHolder(@NonNull ItemViewHolder holder, int position) {
         ItemModel item = itemList.get(position);
-        String inputText = holder.etNumber.getText().toString().trim();
 
         holder.etNumber.setVisibility(View.VISIBLE);
-        holder.item_text_itog.setTextColor(Color.BLACK);
-        holder.textView.setText(item.getName());
-        holder.item_text_itog.setText(String.valueOf(item.getAmountplus()));
+        holder.tvName.setText(item.getName());
         holder.etNumber.setText("");
 
+        int amount = 0;
+        try {
+            amount = Integer.parseInt(item.getAmount());
+        } catch (Exception ignored) {}
 
-        int amount = Integer.parseInt(item.getAmount());
-        Log.d("demo2", "onBindViewHolder: " + item.getName() +amount);
-        if (amount <= 40) {
-            holder.item_text_itog.setTextColor(Color.BLUE);
+        String amountPlusStr = item.getAmountplus();
+        if (amountPlusStr == null || amountPlusStr.isEmpty()) {
+            amountPlusStr = "0";
         }
-        if ((amount == 100) || (amount == 101) || (amount == 102) || (amount == 103) || (amount == 104) || (amount == 105 || (amount == 106))) {
-            holder.item_text_itog.setTextColor(Color.RED);
-        }
-        if (amount == 107) {
-            holder.item_text_itog.setTextColor(Color.BLUE);
+        holder.tvHistory.setText("Тарих: " + amountPlusStr);
+
+        boolean is77Out = amountPlusStr.contains("(7)");
+
+        // Styling based on score rules
+        if (is77Out) {
+            holder.etNumber.setVisibility(View.GONE);
+            holder.tvBadge.setText("УЧДИ! (7)");
+            holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
+            holder.tvBadge.setTextColor(Color.parseColor("#C62828"));
+        } else if (amount == 107) {
+            holder.tvBadge.setText("Омадли 107! (0 балл)");
+            holder.tvBadge.setBackgroundColor(Color.parseColor("#FFF8E1"));
+            holder.tvBadge.setTextColor(Color.parseColor("#F57F17"));
             dbSQL.updateNull(String.valueOf(item.getId()), "0", "0");
-            holder.item_text_itog.setText(item.getName() + "жон сизда омадли 107, сизда хозир 0");
-        }
-        if (amount >= 108) {
+        } else if (amount >= 108) {
             holder.etNumber.setVisibility(View.GONE);
-            holder.item_text_itog.setTextColor(Color.RED);
-            holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз. Ҳисобингиз " + item.getAmount());
+            holder.tvBadge.setText("УЧДИ! (" + amount + ")");
+            holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
+            holder.tvBadge.setTextColor(Color.parseColor("#C62828"));
+        } else if (amount >= 100) {
+            holder.tvBadge.setText(amount + " балл (Хавфли!)");
+            holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
+            holder.tvBadge.setTextColor(Color.parseColor("#D32F2F"));
+        } else if (amount <= 40) {
+            holder.tvBadge.setText(amount + " балл");
+            holder.tvBadge.setBackgroundColor(Color.parseColor("#E3F2FD"));
+            holder.tvBadge.setTextColor(Color.parseColor("#1976D2"));
+        } else {
+            holder.tvBadge.setText(amount + " балл");
+            holder.tvBadge.setBackgroundColor(Color.parseColor("#E8F5E9"));
+            holder.tvBadge.setTextColor(Color.parseColor("#2E7D32"));
         }
-        if (amount <= -400) {
-            holder.etNumber.setVisibility(View.GONE);
-            holder.item_text_itog.setTextColor(Color.RED);
-            holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлингизда бахтсиз 7");
-        }
-//        else {
-//            holder.item_text_itog.setTextColor(Color.BLACK);
-//        }
 
-        // Ҳар бир EditText учун киритилган қийматни оламиз
+        // Input listener
         holder.etNumber.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -106,41 +104,35 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
             public void afterTextChanged(Editable s) {
                 String numberStr = s.toString().trim();
                 if (!numberStr.isEmpty() && isNumeric(numberStr)) {
-                    item.setTemporaryAmount(Integer.parseInt(numberStr));
-                } else {
-                    item.setTemporaryAmount(0); // Нотўғри ёки бўш қиймат учун 0 сақланади
-                }
-                if (!numberStr.isEmpty() && isNumeric(numberStr)) {
                     int inputNumber = Integer.parseInt(numberStr);
+                    item.setTemporaryAmount(inputNumber);
+
                     if (inputNumber == -77) {
-                        holder.etNumber.setVisibility(View.GONE);
-                        holder.item_text_itog.setTextColor(Color.RED);
-                        holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлингизда бахтсиз 7");
-                        dbSQL.updateNull(String.valueOf(item.getId()), "-777", "0");
+                        holder.tvBadge.setText("УЧДИ! (7)");
+                        holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
+                        holder.tvBadge.setTextColor(Color.parseColor("#C62828"));
                     }
+                } else {
+                    item.setTemporaryAmount(0);
                 }
-
             }
-
         });
 
-//        if (!inputText.isEmpty()) {
-//            try {
-//                if (inputText.equals("-77")) {
-//                    holder.etNumber.setVisibility(View.GONE);
-//                    holder.item_text_itog.setTextColor(Color.RED);
-//                    holder.item_text_itog.setText(item.getName() + "жон сиз учдингиз қўлизда бахтсиз 7");
-//                } else {
-//                }
-//            } catch (NumberFormatException e) {
-//            }
-//        }
+        // Filter numbers
+        holder.etNumber.setFilters(new InputFilter[]{
+                (source, start, end, dest, dstart, dend) -> {
+                    if (source.toString().matches("^-?\\d*$")) {
+                        return null;
+                    }
+                    return "";
+                }
+        });
 
-        // Ўчириш функцияси қолади
-        holder.textView.setOnClickListener(v -> {
+        // Delete single player
+        holder.btnDelete.setOnClickListener(v -> {
             new AlertDialog.Builder(context)
                     .setTitle("Ўчириш")
-                    .setMessage(item.getName() + " маълумотини ўчиришга ишончингиз комилми?")
+                    .setMessage(item.getName() + " ни ўйиндан ўчиришга ишончингиз комилми?")
                     .setPositiveButton("Ҳа", (dialog, which) -> {
                         dbSQL.deleteSelect(String.valueOf(item.getId()));
                         Refresh(dbSQL.readCourses());
@@ -148,44 +140,15 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
                     .setNegativeButton("Йўқ", null)
                     .show();
         });
-
-        holder.etNumber.setFilters(new InputFilter[]{
-                (source, start, end, dest, dstart, dend) -> {
-                    // Фақат манфий ёки рақамлар қабул қилинади
-                    if (source.toString().matches("^-?\\d*$")) {
-                        return null; // Қабул қилинади
-                    }
-                    return ""; // Қабул қилинмайди
-                }
-        });
-
-
     }
 
-    // Ёрдамчи метод: Қиймат тўғри ёзилганини текшириш
-    private boolean isValidNumber(String str) {
-        if (str.equals("-")) {
-            return false; // Фақат "минус" киритилган бўлса, нотўғри деб қаралади
-        }
-
-        try {
-            Integer.parseInt(str); // Мусбат ёки манфий сонни текшириш
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    // Барча EditText'ларни тозалаш
     public void clearAllInputs() {
         for (ItemModel item : itemList) {
             item.setTemporaryAmount(0);
-
         }
         notifyDataSetChanged();
     }
 
-    // Ёрдамчи метод: Сон ёки йўқлигини текшириш
     private boolean isNumeric(String str) {
         try {
             Integer.parseInt(str);
@@ -195,11 +158,10 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         }
     }
 
-    void Refresh(ArrayList<ItemModel> events) {
+    public void Refresh(ArrayList<ItemModel> events) {
         itemList.clear();
         itemList.addAll(events);
         notifyDataSetChanged();
-
     }
 
     @Override
@@ -211,21 +173,22 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         Map<Integer, Integer> numberMap = new HashMap<>();
         for (ItemModel item : itemList) {
             numberMap.put(item.getId(), item.getTemporaryAmount());
-
         }
         return numberMap;
     }
 
     public static class ItemViewHolder extends RecyclerView.ViewHolder {
-        TextView textView, item_text_itog;
+        TextView tvName, tvBadge, tvHistory;
         EditText etNumber;
+        ImageView btnDelete;
 
         public ItemViewHolder(@NonNull View itemView) {
             super(itemView);
-            textView = itemView.findViewById(R.id.item_text);
-            item_text_itog = itemView.findViewById(R.id.item_text_itog);
+            tvName = itemView.findViewById(R.id.item_text);
+            tvBadge = itemView.findViewById(R.id.item_text_itog);
+            tvHistory = itemView.findViewById(R.id.item_text_history);
             etNumber = itemView.findViewById(R.id.etNumber);
+            btnDelete = itemView.findViewById(R.id.btn_delete_item);
         }
     }
 }
-

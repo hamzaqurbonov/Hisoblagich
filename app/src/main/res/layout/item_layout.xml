@@ -1,51 +1,109 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="8dp">
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="6dp"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="3dp"
+    app:cardBackgroundColor="#FFFFFF">
 
-<!--    <ImageView-->
-<!--        android:id="@+id/delete_select"-->
-<!--        android:layout_width="25dp"-->
-<!--        android:layout_height="25dp"-->
-<!--        android:src="@drawable/delete_24px" />-->
-    <TextView
-        android:id="@+id/item_text"
-        android:layout_width="82dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:layout_marginStart="16dp"
-        android:textSize="16sp" />
+        android:orientation="vertical"
+        android:padding="14dp">
 
-    <EditText
-        android:id="@+id/etNumber"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:hint="Сон"
-        android:maxLength="3"
-        android:digits="0123456789-."
-        android:inputType="text"/>
+        <!-- Header Row: Name & Status Badge -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-<!--    <Button-->
-<!--        android:id="@+id/btn_num"-->
-<!--        android:layout_width="40dp"-->
-<!--        android:layout_height="40dp"-->
-<!--        android:text="Ok" />-->
+            <TextView
+                android:id="@+id/item_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_toStartOf="@id/item_text_itog"
+                android:text="Ўйинчи Исми"
+                android:textColor="#212121"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
 
-    <TextView
-        android:id="@+id/item_text_itog"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:layout_marginStart="16dp"
-        android:text="Хеч нарса йўқ"
-        android:textSize="16sp" />
-<!--    <TextView-->
-<!--        android:id="@+id/item_text_plus"-->
-<!--        android:layout_width="wrap_content"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:layout_marginStart="16dp"-->
-<!--        android:text="Х"-->
-<!--        android:textSize="16sp" />-->
-</LinearLayout>
+            <TextView
+                android:id="@+id/item_text_itog"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:background="#E3F2FD"
+                android:textColor="#1976D2"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="0 балл" />
+        </RelativeLayout>
+
+        <!-- Middle Row: History progression -->
+        <TextView
+            android:id="@+id/item_text_history"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="8dp"
+            android:textColor="#616161"
+            android:textSize="14sp"
+            android:text="Тарих: 0" />
+
+        <!-- Divider line -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#F0F0F0"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Bottom Row: Input field & Delete action -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Янги балл:"
+                android:textColor="#757575"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:id="@+id/btn_delete_item"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="6dp"
+                android:layout_marginEnd="12dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/delete_24px"
+                app:tint="#E53935" />
+
+            <EditText
+                android:id="@+id/etNumber"
+                android:layout_width="80dp"
+                android:layout_height="44dp"
+                android:hint="Балл"
+                android:maxLength="4"
+                android:digits="0123456789-."
+                android:inputType="numberSigned"
+                android:background="@drawable/edittext_bg"
+                android:gravity="center"
+                android:textColor="#111111"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
