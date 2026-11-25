@@ -1,12 +1,15 @@
 package com.example.hisob;
 
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,19 +25,22 @@ import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
-    DbSQL dbSQL;
-    Spinner spinner_young;
+    private DbSQL dbSQL;
+    private FirebaseManager fbManager;
+    private ValueEventListener firebaseGameListener;
+
+    private Spinner spinner_young;
     private Button btnClear, btnname;
-    ImageView delete_all;
-    TextView tvHeaderTitle;
+    private ImageView delete_all, btnSwitchTeam;
+    private TextView tvHeaderTitle, tvTeamInfo;
 
-    ArrayList<ItemModel> list = new ArrayList<>();
-    RecyclerView item_recycler, rvGameHistory, rvStatistics;
-    ItemAdapter adapter;
-    GameHistoryAdapter historyAdapter;
-    StatAdapter statAdapter;
+    private ArrayList<ItemModel> list = new ArrayList<>();
+    private RecyclerView item_recycler, rvGameHistory, rvStatistics;
+    private ItemAdapter adapter;
+    private GameHistoryAdapter historyAdapter;
+    private StatAdapter statAdapter;
 
-    String emploee;
+    private String emploee;
 
     public static boolean isPlayerOut(ItemModel player) {
         if (player == null) return false;
@@ -52,8 +59,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         dbSQL = new DbSQL(this);
+        fbManager = FirebaseManager.getInstance(this);
 
         tvHeaderTitle = findViewById(R.id.tvHeaderTitle);
+        tvTeamInfo = findViewById(R.id.tvTeamInfo);
+        btnSwitchTeam = findViewById(R.id.btnSwitchTeam);
+
         item_recycler = findViewById(R.id.item_recycler);
         rvGameHistory = findViewById(R.id.rvGameHistory);
         rvStatistics = findViewById(R.id.rvStatistics);
@@ -68,11 +79,50 @@ public class MainActivity extends AppCompatActivity {
         rvGameHistory.setLayoutManager(new LinearLayoutManager(this));
         rvStatistics.setLayoutManager(new LinearLayoutManager(this));
 
-        list = dbSQL.readCourses();
         adapter = new ItemAdapter(MainActivity.this, list);
         item_recycler.setAdapter(adapter);
 
-        // Bottom Navigation Tabs setup
+        setupBottomNavigation();
+
+        btnSwitchTeam.setOnClickListener(v -> showTeamManagerDialog());
+
+        btnClear.setOnClickListener(v -> processRoundCalculation());
+
+        btnname.setOnClickListener(v -> {
+            if (emploee != null && !emploee.isEmpty()) {
+                String teamCode = fbManager.getCurrentTeamCode();
+                if (!teamCode.isEmpty()) {
+                    fbManager.addPlayerToGame(teamCode, emploee);
+                } else {
+                    dbSQL.addNewCourse(emploee, "0", "0");
+                    Refresh(dbSQL.readCourses());
+                }
+            }
+        });
+
+        delete_all.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Янги ўйин")
+                    .setMessage("Ўйинни тугатиб, барчасини ўчиришга ишончингиз комилми?\n(Натижалар Статистика ва Тарихга сақланади)")
+                    .setPositiveButton("Ҳа", (dialog, which) -> {
+                        String teamCode = fbManager.getCurrentTeamCode();
+                        if (!teamCode.isEmpty()) {
+                            fbManager.clearActiveGameInFirebase(teamCode);
+                        } else {
+                            dbSQL.finishGameAndRecordStats(list);
+                            dbSQL.deleteAllData();
+                            Refresh(dbSQL.readCourses());
+                        }
+                    })
+                    .setNegativeButton("Йўқ", null)
+                    .show();
+        });
+
+        spinner_young();
+        loadActiveTeamState();
+    }
+
+    private void setupBottomNavigation() {
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         View layoutHisob = findViewById(R.id.layout_hisob);
         View layoutHistory = findViewById(R.id.layout_history);
@@ -80,6 +130,8 @@ public class MainActivity extends AppCompatActivity {
 
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
+            String teamCode = fbManager.getCurrentTeamCode();
+
             if (itemId == R.id.nav_hisob) {
                 layoutHisob.setVisibility(View.VISIBLE);
                 layoutHistory.setVisibility(View.GONE);
@@ -92,9 +144,16 @@ public class MainActivity extends AppCompatActivity {
                 layoutStat.setVisibility(View.GONE);
                 tvHeaderTitle.setText("Ўйинлар Тарихи");
 
-                ArrayList<GameHistoryModel> historyList = dbSQL.getGameHistory();
-                historyAdapter = new GameHistoryAdapter(historyList);
-                rvGameHistory.setAdapter(historyAdapter);
+                if (!teamCode.isEmpty()) {
+                    fbManager.listenToTeamHistory(teamCode, historyList -> {
+                        historyAdapter = new GameHistoryAdapter(historyList);
+                        rvGameHistory.setAdapter(historyAdapter);
+                    });
+                } else {
+                    ArrayList<GameHistoryModel> historyList = dbSQL.getGameHistory();
+                    historyAdapter = new GameHistoryAdapter(historyList);
+                    rvGameHistory.setAdapter(historyAdapter);
+                }
                 return true;
             } else if (itemId == R.id.nav_stat) {
                 layoutHisob.setVisibility(View.GONE);
@@ -102,19 +161,58 @@ public class MainActivity extends AppCompatActivity {
                 layoutStat.setVisibility(View.VISIBLE);
                 tvHeaderTitle.setText("Ўйинчилар Статистикаси");
 
-                ArrayList<StatModel> statList = dbSQL.getPlayerStats();
-                statAdapter = new StatAdapter(statList);
-                rvStatistics.setAdapter(statAdapter);
+                if (!teamCode.isEmpty()) {
+                    fbManager.listenToTeamStats(teamCode, statList -> {
+                        statAdapter = new StatAdapter(statList);
+                        rvStatistics.setAdapter(statAdapter);
+                    });
+                } else {
+                    ArrayList<StatModel> statList = dbSQL.getPlayerStats();
+                    statAdapter = new StatAdapter(statList);
+                    rvStatistics.setAdapter(statAdapter);
+                }
                 return true;
             }
             return false;
         });
+    }
 
-        btnClear.setOnClickListener(v -> {
-            // Track active players before score update
+    private void loadActiveTeamState() {
+        String teamCode = fbManager.getCurrentTeamCode();
+        String teamName = fbManager.getCurrentTeamName();
+
+        if (!teamCode.isEmpty()) {
+            tvTeamInfo.setText("👥 " + teamName + " (Код: " + teamCode + ")");
+
+            if (firebaseGameListener != null) {
+                fbManager.removeGameListener(teamCode, firebaseGameListener);
+            }
+
+            firebaseGameListener = fbManager.listenToActiveGame(teamCode, activePlayers -> {
+                Refresh((ArrayList<ItemModel>) activePlayers);
+                checkWinner((ArrayList<ItemModel>) activePlayers);
+            });
+        } else {
+            tvTeamInfo.setText("👥 Оффлайн Режим (Маҳаллий ўйин)");
+            Refresh(dbSQL.readCourses());
+        }
+    }
+
+    private void processRoundCalculation() {
+        String teamCode = fbManager.getCurrentTeamCode();
+        Map<Integer, Integer> numberMap = adapter.collectAllNumbers();
+
+        if (!teamCode.isEmpty()) {
+            for (ItemModel item : list) {
+                int inputNum = item.getTemporaryAmount();
+                if (inputNum != 0) {
+                    fbManager.updateCourseInFirebase(teamCode, item.getName(), inputNum);
+                }
+            }
+            adapter.clearAllInputs();
+        } else {
             ArrayList<ItemModel> beforeList = dbSQL.readCourses();
 
-            Map<Integer, Integer> numberMap = adapter.collectAllNumbers();
             for (Map.Entry<Integer, Integer> entry : numberMap.entrySet()) {
                 int id = entry.getKey();
                 int amount = entry.getValue();
@@ -127,19 +225,12 @@ public class MainActivity extends AppCompatActivity {
             adapter.clearAllInputs();
             ArrayList<ItemModel> updatedList = dbSQL.readCourses();
 
-            // Track newly eliminated players in this turn
             List<Integer> newlyEliminatedIds = new ArrayList<>();
-
             for (ItemModel player : updatedList) {
-                boolean isNowOut = isPlayerOut(player);
-                if (isNowOut) {
-                    // Check if player was active before
+                if (isPlayerOut(player)) {
                     for (ItemModel prev : beforeList) {
-                        if (prev.getId() == player.getId()) {
-                            boolean wasActive = !isPlayerOut(prev);
-                            if (wasActive) {
-                                newlyEliminatedIds.add(player.getId());
-                            }
+                        if (prev.getId() == player.getId() && !isPlayerOut(prev)) {
+                            newlyEliminatedIds.add(player.getId());
                             break;
                         }
                     }
@@ -152,29 +243,79 @@ public class MainActivity extends AppCompatActivity {
 
             Refresh(updatedList);
             checkWinner(updatedList);
-        });
+        }
+    }
 
-        btnname.setOnClickListener(v -> {
-            if (emploee != null && !emploee.isEmpty()) {
-                dbSQL.addNewCourse(emploee, "0", "0");
-                Refresh(dbSQL.readCourses());
+    private void showTeamManagerDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_team_manager, null);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).create();
+
+        EditText etUserName = dialogView.findViewById(R.id.etUserName);
+        EditText etCreateTeamName = dialogView.findViewById(R.id.etCreateTeamName);
+        Button btnCreateTeamSubmit = dialogView.findViewById(R.id.btnCreateTeamSubmit);
+
+        EditText etJoinTeamCode = dialogView.findViewById(R.id.etJoinTeamCode);
+        Button btnJoinTeamSubmit = dialogView.findViewById(R.id.btnJoinTeamSubmit);
+        Button btnPlayOffline = dialogView.findViewById(R.id.btnPlayOffline);
+
+        etUserName.setText(fbManager.getUserName());
+
+        btnCreateTeamSubmit.setOnClickListener(v -> {
+            String userName = etUserName.getText().toString().trim();
+            String teamName = etCreateTeamName.getText().toString().trim();
+
+            if (userName.isEmpty() || teamName.isEmpty()) {
+                Toast.makeText(this, "Исм ва Жамоа номини киритинг!", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            fbManager.createTeam(teamName, userName, new FirebaseManager.OnTeamCreatedListener() {
+                @Override
+                public void onSuccess(String teamCode, String name) {
+                    dialog.dismiss();
+                    Toast.makeText(MainActivity.this, "Жамоа яратилди! Код: " + teamCode, Toast.LENGTH_LONG).show();
+                    loadActiveTeamState();
+                }
+
+                @Override
+                public void onError(String message) {
+                    Toast.makeText(MainActivity.this, "Хатолик: " + message, Toast.LENGTH_SHORT).show();
+                }
+            });
         });
 
-        delete_all.setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("Янги ўйин")
-                    .setMessage("Ўйинни тугатиб, барчасини ўчиришга ишончингиз комилми?\n(Натижалар Статистика ва Тарихга сақланади)")
-                    .setPositiveButton("Ҳа", (dialog, which) -> {
-                        dbSQL.finishGameAndRecordStats(list);
-                        dbSQL.deleteAllData();
-                        Refresh(dbSQL.readCourses());
-                    })
-                    .setNegativeButton("Йўқ", null)
-                    .show();
+        btnJoinTeamSubmit.setOnClickListener(v -> {
+            String userName = etUserName.getText().toString().trim();
+            String code = etJoinTeamCode.getText().toString().trim();
+
+            if (userName.isEmpty() || code.length() != 6) {
+                Toast.makeText(this, "Исм ва 6 хонали кодни тўғри киритинг!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            fbManager.joinTeam(code, userName, new FirebaseManager.OnTeamJoinedListener() {
+                @Override
+                public void onSuccess(String teamCode, String name) {
+                    dialog.dismiss();
+                    Toast.makeText(MainActivity.this, name + " жамоасига қўшилдингиз!", Toast.LENGTH_SHORT).show();
+                    loadActiveTeamState();
+                }
+
+                @Override
+                public void onError(String message) {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            });
         });
 
-        spinner_young();
+        btnPlayOffline.setOnClickListener(v -> {
+            fbManager.saveCurrentTeam("", "");
+            dialog.dismiss();
+            Toast.makeText(this, "Оффлайн режимга ўтилди", Toast.LENGTH_SHORT).show();
+            loadActiveTeamState();
+        });
+
+        dialog.show();
     }
 
     private void checkWinner(ArrayList<ItemModel> currentPlayers) {
@@ -209,9 +350,14 @@ public class MainActivity extends AppCompatActivity {
                     .setMessage("Табриклаймиз! " + winnerName + " энг охирида 108 дан ошмай қолди ва ҒОЛИБ бўлди!\n\nЎйинни тугатиб, статистикага сақлаймизми?")
                     .setCancelable(false)
                     .setPositiveButton("Сақлаш ва Янги ўйин", (dialog, which) -> {
-                        dbSQL.finishGameAndRecordStats(currentPlayers);
-                        dbSQL.deleteAllData();
-                        Refresh(dbSQL.readCourses());
+                        String teamCode = fbManager.getCurrentTeamCode();
+                        if (!teamCode.isEmpty()) {
+                            fbManager.clearActiveGameInFirebase(teamCode);
+                        } else {
+                            dbSQL.finishGameAndRecordStats(currentPlayers);
+                            dbSQL.deleteAllData();
+                            Refresh(dbSQL.readCourses());
+                        }
                     })
                     .setNegativeButton("Давом этиш", null)
                     .show();
@@ -222,9 +368,14 @@ public class MainActivity extends AppCompatActivity {
                     .setMessage("Барча ўйинчилар 108 дан ошди. Энг кам балл билан " + winnerName + " ҒОЛИБ бўлди!\n\nЎйинни тугатиб, статистикага сақлаймизми?")
                     .setCancelable(false)
                     .setPositiveButton("Сақлаш ва Янги ўйин", (dialog, which) -> {
-                        dbSQL.finishGameAndRecordStats(currentPlayers);
-                        dbSQL.deleteAllData();
-                        Refresh(dbSQL.readCourses());
+                        String teamCode = fbManager.getCurrentTeamCode();
+                        if (!teamCode.isEmpty()) {
+                            fbManager.clearActiveGameInFirebase(teamCode);
+                        } else {
+                            dbSQL.finishGameAndRecordStats(currentPlayers);
+                            dbSQL.deleteAllData();
+                            Refresh(dbSQL.readCourses());
+                        }
                     })
                     .setNegativeButton("Давом этиш", null)
                     .show();

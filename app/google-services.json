@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "278561179805",
+    "project_id": "hisoblagich-108-app",
+    "firebase_url": "https://hisoblagich-108-app-default-rtdb.firebaseio.com",
+    "storage_bucket": "hisoblagich-108-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:278561179805:android:5d96606208aea3b8836c74",
+        "android_client_info": {
+          "package_name": "com.example.hisob"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBaC49QieS0KOsiS9YRUljBk3cZU85MvBQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#FFFFFF">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="👥 Жамоани Танлаш ва Бошқариш"
+        android:textColor="#1976D2"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <!-- User Display Name -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Сизнинг Исмингиз:"
+        android:textColor="#333333"
+        android:textSize="14sp"
+        android:textStyle="bold"/>
+
+    <EditText
+        android:id="@+id/etUserName"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:hint="Исмингизни киритинг"
+        android:inputType="textPersonName"
+        android:background="@drawable/edittext_bg"
+        android:paddingHorizontal="12dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="16dp"
+        android:textColor="#111111"/>
+
+    <!-- Section 1: Create Team -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#F5F5F5">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="➕ Янги Жамоа Яратиш"
+                android:textColor="#2E7D32"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/etCreateTeamName"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:hint="Жамоа номи (масалан: Дўстлар 108)"
+                android:background="@drawable/edittext_bg"
+                android:paddingHorizontal="10dp"
+                android:layout_marginTop="8dp"
+                android:textColor="#111111"
+                android:textSize="14sp"/>
+
+            <Button
+                android:id="@+id/btnCreateTeamSubmit"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Жамоа Яратиш ва Код Олиш"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#2E7D32"
+                android:textStyle="bold"
+                android:layout_marginTop="8dp"
+                app:cornerRadius="8dp"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Section 2: Join Team -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#F5F5F5">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🔑 Код Орқали Жамоага Қўшилиш"
+                android:textColor="#1565C0"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/etJoinTeamCode"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:hint="6 хонали жамоа коди (масалан: 784912)"
+                android:inputType="number"
+                android:maxLength="6"
+                android:background="@drawable/edittext_bg"
+                android:paddingHorizontal="10dp"
+                android:layout_marginTop="8dp"
+                android:textColor="#111111"
+                android:textSize="14sp"/>
+
+            <Button
+                android:id="@+id/btnJoinTeamSubmit"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Жамоага Онлайн Қўшилиш"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#1565C0"
+                android:textStyle="bold"
+                android:layout_marginTop="8dp"
+                app:cornerRadius="8dp"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Offline Play -->
+    <Button
+        android:id="@+id/btnPlayOffline"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="📲 Оффлайн (Маҳаллий) Танлов"
+        android:textColor="#757575"
+        app:strokeColor="#BDBDBD"/>
+
+</LinearLayout>

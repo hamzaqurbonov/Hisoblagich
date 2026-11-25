@@ -386,7 +386,7 @@ public class DbSQL extends SQLiteOpenHelper {
                 detailsBuilder.append(" (7)");
             }
             detailsBuilder.append(" (").append(p.computedRank).append("-ўрин)");
-            if (isOut && !is77) detailsBuilder.append(" [Учди]");
+            if (isOut && !is77) detailsBuilder.append("");
             detailsBuilder.append("\n");
         }
 
