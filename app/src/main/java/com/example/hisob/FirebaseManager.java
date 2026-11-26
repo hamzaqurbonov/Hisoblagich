@@ -331,13 +331,16 @@ public class FirebaseManager {
                     String name = child.child("name").getValue(String.class);
                     String amount = child.child("amount").getValue(String.class);
                     String amountplus = child.child("amountplus").getValue(String.class);
+                    Long orderVal = child.child("order").getValue(Long.class);
+                    int order = orderVal != null ? orderVal.intValue() : idCounter;
 
                     if (name != null) {
                         if (amount == null) amount = "0";
                         if (amountplus == null) amountplus = "0";
-                        list.add(new ItemModel(idCounter++, name, amount, amountplus));
+                        list.add(new ItemModel(idCounter++, name, amount, amountplus, order));
                     }
                 }
+                list.sort(Comparator.comparingInt(ItemModel::getOrder));
                 listener.onDataChanged(list);
             }
 
@@ -355,7 +358,7 @@ public class FirebaseManager {
         }
     }
 
-    public void addPlayerToGame(String teamCode, String playerName) {
+    public void addPlayerToGameWithOrder(String teamCode, String playerName, int order) {
         if (teamCode == null || teamCode.isEmpty()) return;
         DatabaseReference pRef = mDatabase.child("teams").child(teamCode).child("activeGame").child("players").child(playerName);
 
@@ -364,9 +367,14 @@ public class FirebaseManager {
         data.put("amount", "0");
         data.put("amountplus", "0");
         data.put("elim_order", 0);
+        data.put("order", order);
         pRef.setValue(data);
 
         addPlayerToTeamList(teamCode, playerName);
+    }
+
+    public void addPlayerToGame(String teamCode, String playerName) {
+        addPlayerToGameWithOrder(teamCode, playerName, 999);
     }
 
     public void removePlayerFromGame(String teamCode, String playerName) {
@@ -381,6 +389,32 @@ public class FirebaseManager {
         updates.put("amount", "0");
         updates.put("amountplus", "0");
         pRef.updateChildren(updates);
+    }
+
+    public void recordFirebasePlayerElimination(String teamCode, String playerName) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+        DatabaseReference playersRef = mDatabase.child("teams").child(teamCode).child("activeGame").child("players");
+
+        playersRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                int maxOrder = 0;
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    Long orderVal = child.child("elim_order").getValue(Long.class);
+                    if (orderVal != null && orderVal.intValue() > maxOrder) {
+                        maxOrder = orderVal.intValue();
+                    }
+                }
+                DataSnapshot pChild = snapshot.child(playerName);
+                Long currentOrder = pChild.child("elim_order").getValue(Long.class);
+                if (currentOrder == null || currentOrder.intValue() == 0) {
+                    playersRef.child(playerName).child("elim_order").setValue(maxOrder + 1);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
     }
 
     public void updateCourseInFirebase(String teamCode, String playerName, int addedAmount) {
@@ -402,6 +436,7 @@ public class FirebaseManager {
                         if (!amountPlusStr.contains("(7)")) {
                             String newPlus = amountPlusStr.isEmpty() ? "(7)" : amountPlusStr + " (7)";
                             pRef.child("amountplus").setValue(newPlus);
+                            recordFirebasePlayerElimination(teamCode, playerName);
                             incrementTeamStat(teamCode, playerName, "times_77");
                         }
                         return;
@@ -426,6 +461,10 @@ public class FirebaseManager {
                     updates.put("amount", String.valueOf(newAmount));
                     updates.put("amountplus", newAmountPlus);
                     pRef.updateChildren(updates);
+
+                    if (newAmount >= 108 && currentAmount < 108) {
+                        recordFirebasePlayerElimination(teamCode, playerName);
+                    }
 
                     if (newAmount == 107) {
                         incrementTeamStat(teamCode, playerName, "times_107");
@@ -493,41 +532,39 @@ public class FirebaseManager {
                     }
                 }
 
+                // Active players: lowest score first (winner, 1st place)
                 activePlayers.sort(Comparator.comparingInt(p -> p.amount));
-                eliminatedPlayers.sort((p1, p2) -> Integer.compare(p2.elimOrder, p1.elimOrder));
+
+                // Eliminated players: player eliminated LAST gets BETTER rank (e.g. 2nd place)
+                eliminatedPlayers.sort((p1, p2) -> {
+                    int order1 = p1.elimOrder;
+                    int order2 = p2.elimOrder;
+
+                    if (order1 != order2) {
+                        if (order1 == 0) order1 = 999; // order 0 means eliminated in final turn -> stayed longest!
+                        if (order2 == 0) order2 = 999;
+                        if (order1 != order2) {
+                            return Integer.compare(order2, order1); // Higher elimOrder = eliminated later = better rank
+                        }
+                    }
+                    return Integer.compare(p1.amount, p2.amount); // Lower score (closest to 107) = stayed longer
+                });
 
                 int currentRank = 1;
                 String winnerName = "Аниқланмади";
 
                 for (DbSQL.PlayerGameStatus p : activePlayers) {
-                    p.computedRank = currentRank;
-                    if (currentRank == 1) {
+                    p.computedRank = currentRank++;
+                    if (p.computedRank == 1) {
                         winnerName = p.name;
                     }
-                    currentRank++;
                 }
 
-                int lastElimOrder = -1;
-                int rankForCurrentGroup = currentRank;
-
-                for (int i = 0; i < eliminatedPlayers.size(); i++) {
-                    DbSQL.PlayerGameStatus p = eliminatedPlayers.get(i);
-                    if (i == 0) {
-                        p.computedRank = rankForCurrentGroup;
-                        lastElimOrder = p.elimOrder;
-                        if (winnerName.equals("Аниқланмади")) {
-                            winnerName = p.name;
-                        }
-                    } else {
-                        if (p.elimOrder == lastElimOrder) {
-                            p.computedRank = rankForCurrentGroup;
-                        } else {
-                            rankForCurrentGroup = currentRank;
-                            p.computedRank = rankForCurrentGroup;
-                            lastElimOrder = p.elimOrder;
-                        }
+                for (DbSQL.PlayerGameStatus p : eliminatedPlayers) {
+                    p.computedRank = currentRank++;
+                    if (winnerName.equals("Аниқланмади") && p.computedRank == 1) {
+                        winnerName = p.name;
                     }
-                    currentRank++;
                 }
 
                 // Sort statuses by computedRank ascending (1-ўрин first at top)
@@ -546,7 +583,7 @@ public class FirebaseManager {
                         detailsBuilder.append(" (7)");
                     }
                     detailsBuilder.append(" (").append(p.computedRank).append("-ўрин)");
-                    if (isOut && !is77) detailsBuilder.append(" [Учди]");
+                    if (isOut && !is77) detailsBuilder.append("");
                     detailsBuilder.append("\n");
                 }
 
@@ -595,8 +632,37 @@ public class FirebaseManager {
                     });
                 }
 
-                // Clear Active Game
-                clearActiveGameInFirebase(teamCode);
+                // Reset active game scores to 0 for new match, and set 1st place winner to order = 1 (position 0 / Card Dealer 🎴)
+                DatabaseReference activePlayersRef = mDatabase.child("teams").child(teamCode).child("activeGame").child("players");
+                activePlayersRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot activeSnap) {
+                        int defaultOrder = 2;
+                        for (DataSnapshot pChild : activeSnap.getChildren()) {
+                            String pName = pChild.getKey();
+                            if (pName == null) continue;
+
+                            int assignedOrder = defaultOrder++;
+                            for (DbSQL.PlayerGameStatus pStatus : statuses) {
+                                if (pStatus.name.equals(pName) && pStatus.computedRank == 1) {
+                                    assignedOrder = 1; // 1st place winner gets position 0 / Card Dealer 🎴!
+                                    break;
+                                }
+                            }
+
+                            Map<String, Object> resetData = new HashMap<>();
+                            resetData.put("amount", "0");
+                            resetData.put("amountplus", "0");
+                            resetData.put("elim_order", 0);
+                            resetData.put("order", assignedOrder);
+
+                            activePlayersRef.child(pName).updateChildren(resetData);
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
+                });
             }
 
             @Override

@@ -47,6 +47,8 @@ public class DbSQL extends SQLiteOpenHelper {
     private static final String HIST_WINNER = "winner_name";
     private static final String HIST_DETAILS = "details";
 
+    private String lastWinnerName = "";
+
     public DbSQL(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
     }
@@ -122,7 +124,6 @@ public class DbSQL extends SQLiteOpenHelper {
             String currentAmountPlus = cursor.getString(cursor.getColumnIndexOrThrow(AMOUNTPLUS));
 
             if (addedAmount == -77) {
-                // Special code -77: Do NOT subtract 77 from current amount! Keep current positive amount!
                 if (currentAmountPlus == null) currentAmountPlus = "";
                 if (!currentAmountPlus.contains("(7)")) {
                     String newAmountPlus = currentAmountPlus.isEmpty() ? "(7)" : currentAmountPlus + " (7)";
@@ -213,9 +214,18 @@ public class DbSQL extends SQLiteOpenHelper {
         cursorCourses.close();
 
         courseModalArrayList.sort((item1, item2) -> {
-            int amount1 = Integer.parseInt(item1.getAmount());
-            int amount2 = Integer.parseInt(item2.getAmount());
-            return Integer.compare(amount2, amount1);
+            int amount1 = 0, amount2 = 0;
+            try { amount1 = Integer.parseInt(item1.getAmount()); } catch (Exception ignored) {}
+            try { amount2 = Integer.parseInt(item2.getAmount()); } catch (Exception ignored) {}
+
+            if (amount1 != amount2) {
+                return Integer.compare(amount2, amount1);
+            }
+            if (!lastWinnerName.isEmpty()) {
+                if (item1.getName().equals(lastWinnerName)) return -1;
+                if (item2.getName().equals(lastWinnerName)) return 1;
+            }
+            return 0;
         });
 
         return courseModalArrayList;
@@ -225,6 +235,7 @@ public class DbSQL extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         db.execSQL("DELETE FROM " + TABLE_NAME);
         db.execSQL("DELETE FROM sqlite_sequence WHERE name='" + TABLE_NAME + "'");
+        lastWinnerName = "";
         db.close();
     }
 
@@ -299,7 +310,6 @@ public class DbSQL extends SQLiteOpenHelper {
 
         SQLiteDatabase db = this.getWritableDatabase();
 
-        // 1. Fetch current players with elim_order from DB
         List<PlayerGameStatus> statuses = new ArrayList<>();
         Cursor cursorActive = db.rawQuery("SELECT * FROM " + TABLE_NAME, null);
         if (cursorActive.moveToFirst()) {
@@ -322,7 +332,6 @@ public class DbSQL extends SQLiteOpenHelper {
             return;
         }
 
-        // Separate active vs eliminated
         List<PlayerGameStatus> activePlayers = new ArrayList<>();
         List<PlayerGameStatus> eliminatedPlayers = new ArrayList<>();
 
@@ -336,44 +345,42 @@ public class DbSQL extends SQLiteOpenHelper {
             }
         }
 
+        // Active players: lowest score first (winner, 1st place)
         activePlayers.sort(Comparator.comparingInt(p -> p.amount));
-        eliminatedPlayers.sort((p1, p2) -> Integer.compare(p2.elimOrder, p1.elimOrder));
+
+        // Eliminated players: player eliminated LAST gets BETTER rank (e.g. 2nd place)
+        eliminatedPlayers.sort((p1, p2) -> {
+            int order1 = p1.elimOrder;
+            int order2 = p2.elimOrder;
+
+            if (order1 != order2) {
+                if (order1 == 0) order1 = 999;
+                if (order2 == 0) order2 = 999;
+                if (order1 != order2) {
+                    return Integer.compare(order2, order1);
+                }
+            }
+            return Integer.compare(p1.amount, p2.amount);
+        });
 
         int currentRank = 1;
         String winnerName = "Аниқланмади";
 
         for (PlayerGameStatus p : activePlayers) {
-            p.computedRank = currentRank;
-            if (currentRank == 1) {
+            p.computedRank = currentRank++;
+            if (p.computedRank == 1) {
                 winnerName = p.name;
             }
-            currentRank++;
         }
 
-        int lastElimOrder = -1;
-        int rankForCurrentGroup = currentRank;
-
-        for (int i = 0; i < eliminatedPlayers.size(); i++) {
-            PlayerGameStatus p = eliminatedPlayers.get(i);
-            if (i == 0) {
-                p.computedRank = rankForCurrentGroup;
-                lastElimOrder = p.elimOrder;
-                if (winnerName.equals("Аниқланмади")) {
-                    winnerName = p.name;
-                }
-            } else {
-                if (p.elimOrder == lastElimOrder) {
-                    p.computedRank = rankForCurrentGroup;
-                } else {
-                    rankForCurrentGroup = currentRank;
-                    p.computedRank = rankForCurrentGroup;
-                    lastElimOrder = p.elimOrder;
-                }
+        for (PlayerGameStatus p : eliminatedPlayers) {
+            p.computedRank = currentRank++;
+            if (winnerName.equals("Аниқланмади") && p.computedRank == 1) {
+                winnerName = p.name;
             }
-            currentRank++;
         }
 
-        // 2. Build history details
+        // Build history details
         String dateStr = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(new Date());
         StringBuilder detailsBuilder = new StringBuilder();
 
@@ -390,7 +397,7 @@ public class DbSQL extends SQLiteOpenHelper {
             detailsBuilder.append("\n");
         }
 
-        // 3. Update player_stats table
+        // Update player_stats table
         for (PlayerGameStatus p : statuses) {
             boolean isWin = (p.computedRank == 1);
 
@@ -435,12 +442,27 @@ public class DbSQL extends SQLiteOpenHelper {
             cursor.close();
         }
 
-        // 4. Save game history entry
+        // Save game history entry
         ContentValues histValues = new ContentValues();
         histValues.put(HIST_DATE, dateStr);
         histValues.put(HIST_WINNER, winnerName);
         histValues.put(HIST_DETAILS, detailsBuilder.toString().trim());
         db.insert(HISTORY_TABLE, null, histValues);
+
+        // Find 1st place winner
+        for (PlayerGameStatus p : statuses) {
+            if (p.computedRank == 1) {
+                lastWinnerName = p.name;
+                break;
+            }
+        }
+
+        // Reset scores to 0 for new match in SQLite without deleting players
+        ContentValues resetValues = new ContentValues();
+        resetValues.put(AMOUNT, "0");
+        resetValues.put(AMOUNTPLUS, "0");
+        resetValues.put(ELIM_ORDER, 0);
+        db.update(TABLE_NAME, resetValues, null, null);
 
         db.close();
     }

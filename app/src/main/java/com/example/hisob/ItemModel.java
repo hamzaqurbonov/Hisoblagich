@@ -2,19 +2,30 @@ package com.example.hisob;
 
 public class ItemModel {
 
-    private String  name, amount, amountplus;
-    private int  id ;
+    private String name, amount, amountplus;
+    private int id;
     private int temporaryAmount = 0;
-//    private String  amountPlus;
-    public ItemModel(int id, String name, String amount,String amountplus) {
+    private int order = 0;
+
+    public ItemModel(int id, String name, String amount, String amountplus) {
         this.id = id;
         this.name = name;
         this.amount = amount;
         this.amountplus = amountplus;
     }
+
+    public ItemModel(int id, String name, String amount, String amountplus, int order) {
+        this.id = id;
+        this.name = name;
+        this.amount = amount;
+        this.amountplus = amountplus;
+        this.order = order;
+    }
+
     public int getId() {
         return id;
     }
+
     public String getName() {
         return name;
     }
@@ -33,5 +44,13 @@ public class ItemModel {
 
     public void setTemporaryAmount(int temporaryAmount) {
         this.temporaryAmount = temporaryAmount;
+    }
+
+    public int getOrder() {
+        return order;
+    }
+
+    public void setOrder(int order) {
+        this.order = order;
     }
 }

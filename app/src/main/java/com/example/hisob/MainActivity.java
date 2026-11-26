@@ -23,9 +23,9 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private PlayerSelectAdapter activeDialogSelectAdapter;
     private boolean activeDialogIsTrashMode = false;
     private String currentDealerName = "";
+    private AlertDialog winnerDialog = null;
 
     public static boolean isPlayerOut(ItemModel player) {
         if (player == null) return false;
@@ -100,15 +101,14 @@ public class MainActivity extends AppCompatActivity {
 
         delete_all.setOnClickListener(v -> {
             new AlertDialog.Builder(this)
-                    .setTitle("Янги ўйин")
-                    .setMessage("Ўйинни тугатиб, барчасини ўчиришга ишончингиз комилми?\n(Натижалар Статистика ва Тарихга сақланади)")
+                    .setTitle("Барчасини ўчириш")
+                    .setMessage("Барча актив ўйинчиларни ўйиндан ўчиришга ишончингиз комилми?\n(Натижалар Статистикага сақланмайди)")
                     .setPositiveButton("Ҳа", (dialog, which) -> {
                         currentDealerName = "";
                         String teamCode = fbManager.getCurrentTeamCode();
                         if (!teamCode.isEmpty()) {
-                            fbManager.finishGameAndRecordStatsInFirebase(teamCode, list);
+                            fbManager.clearActiveGameInFirebase(teamCode);
                         } else {
-                            dbSQL.finishGameAndRecordStats(list);
                             dbSQL.deleteAllData();
                             Refresh(dbSQL.readCourses());
                         }
@@ -346,14 +346,19 @@ public class MainActivity extends AppCompatActivity {
         btnConfirmSelection.setOnClickListener(v -> {
             Set<String> selectedNames = selectAdapter.getSelectedPlayers();
             if (selectedNames != null && !selectedNames.isEmpty()) {
-                for (String name : selectedNames) {
-                    if (!teamCode.isEmpty()) {
-                        fbManager.addPlayerToGame(teamCode, name);
-                    } else {
+                List<String> shuffledList = new ArrayList<>(selectedNames);
+                Collections.shuffle(shuffledList);
+
+                if (!teamCode.isEmpty()) {
+                    fbManager.clearActiveGameInFirebase(teamCode);
+                    for (int i = 0; i < shuffledList.size(); i++) {
+                        fbManager.addPlayerToGameWithOrder(teamCode, shuffledList.get(i), i + 1);
+                    }
+                } else {
+                    dbSQL.deleteAllData();
+                    for (String name : shuffledList) {
                         dbSQL.addNewCourse(name, "0", "0");
                     }
-                }
-                if (teamCode.isEmpty()) {
                     Refresh(dbSQL.readCourses());
                 }
             }
@@ -534,6 +539,10 @@ public class MainActivity extends AppCompatActivity {
     private void checkWinner(ArrayList<ItemModel> currentPlayers) {
         if (currentPlayers == null || currentPlayers.size() <= 1) return;
 
+        if (winnerDialog != null && winnerDialog.isShowing()) {
+            return;
+        }
+
         ItemModel lastActivePlayer = null;
         int activeCount = 0;
         int minScore = Integer.MAX_VALUE;
@@ -558,73 +567,44 @@ public class MainActivity extends AppCompatActivity {
 
         if (activeCount == 1 && lastActivePlayer != null) {
             String winnerName = lastActivePlayer.getName();
-            new AlertDialog.Builder(this)
+            winnerDialog = new AlertDialog.Builder(this)
                     .setTitle("🏆 Ғолиб Аниқланди!")
                     .setMessage("Табриклаймиз! " + winnerName + " энг охирида 108 дан ошмай қолди ва ҒОЛИБ бўлди!\n\nЎйинни тугатиб, статистикага сақлаймизми?")
                     .setCancelable(false)
                     .setPositiveButton("Сақлаш ва Янги ўйин", (dialog, which) -> {
+                        winnerDialog = null;
                         currentDealerName = "";
                         String teamCode = fbManager.getCurrentTeamCode();
                         if (!teamCode.isEmpty()) {
                             fbManager.finishGameAndRecordStatsInFirebase(teamCode, currentPlayers);
                         } else {
                             dbSQL.finishGameAndRecordStats(currentPlayers);
-                            dbSQL.deleteAllData();
                             Refresh(dbSQL.readCourses());
                         }
                     })
-                    .setNegativeButton("Давом этиш", null)
+                    .setNegativeButton("Давом этиш", (dialog, which) -> winnerDialog = null)
+                    .setOnDismissListener(dialog -> winnerDialog = null)
                     .show();
         } else if (activeCount == 0 && lowestScorePlayer != null) {
             String winnerName = lowestScorePlayer.getName();
-            new AlertDialog.Builder(this)
+            winnerDialog = new AlertDialog.Builder(this)
                     .setTitle("🏆 Ўйин Тугади!")
                     .setMessage("Барча ўйинчилар 108 дан ошди. Энг кам балл билан " + winnerName + " ҒОЛИБ бўлди!\n\nЎйинни тугатиб, статистикага сақлаймизми?")
                     .setCancelable(false)
                     .setPositiveButton("Сақлаш ва Янги ўйин", (dialog, which) -> {
+                        winnerDialog = null;
                         currentDealerName = "";
                         String teamCode = fbManager.getCurrentTeamCode();
                         if (!teamCode.isEmpty()) {
                             fbManager.finishGameAndRecordStatsInFirebase(teamCode, currentPlayers);
                         } else {
                             dbSQL.finishGameAndRecordStats(currentPlayers);
-                            dbSQL.deleteAllData();
                             Refresh(dbSQL.readCourses());
                         }
                     })
-                    .setNegativeButton("Давом этиш", null)
+                    .setNegativeButton("Давом этиш", (dialog, which) -> winnerDialog = null)
+                    .setOnDismissListener(dialog -> winnerDialog = null)
                     .show();
-        }
-    }
-
-    private void updateDealerIfNecessary(List<ItemModel> activePlayers) {
-        if (activePlayers == null || activePlayers.isEmpty()) {
-            currentDealerName = "";
-            return;
-        }
-
-        boolean allZeros = true;
-        for (ItemModel item : activePlayers) {
-            int amt = 0;
-            try { amt = Integer.parseInt(item.getAmount()); } catch (Exception ignored) {}
-            if (amt != 0) {
-                allZeros = false;
-                break;
-            }
-        }
-
-        if (allZeros) {
-            boolean dealerExists = false;
-            for (ItemModel item : activePlayers) {
-                if (item.getName().equals(currentDealerName)) {
-                    dealerExists = true;
-                    break;
-                }
-            }
-            if (!dealerExists || currentDealerName.isEmpty()) {
-                int randomIndex = new Random().nextInt(activePlayers.size());
-                currentDealerName = activePlayers.get(randomIndex).getName();
-            }
         }
     }
 
@@ -632,14 +612,14 @@ public class MainActivity extends AppCompatActivity {
         list.clear();
         if (events != null && !events.isEmpty()) {
             list.addAll(events);
-            updateDealerIfNecessary(list);
 
+            // ALWAYS sort: Active players under 108 at top (highest score first), eliminated players at bottom
             list.sort((item1, item2) -> {
                 boolean out1 = isPlayerOut(item1);
                 boolean out2 = isPlayerOut(item2);
 
                 if (out1 != out2) {
-                    return out1 ? 1 : -1;
+                    return out1 ? 1 : -1; // Active players first, eliminated players at bottom
                 }
 
                 int amount1 = 0, amount2 = 0;
@@ -647,28 +627,28 @@ public class MainActivity extends AppCompatActivity {
                 try { amount2 = Integer.parseInt(item2.getAmount()); } catch (Exception ignored) {}
 
                 if (amount1 != amount2) {
-                    return Integer.compare(amount2, amount1);
+                    return Integer.compare(amount2, amount1); // Highest score first
                 }
-                if (item1.getName().equals(currentDealerName)) return -1;
-                if (item2.getName().equals(currentDealerName)) return 1;
-                return 0;
+
+                return Integer.compare(item1.getOrder(), item2.getOrder());
             });
 
-            boolean anyNonZeroActive = false;
+            // Card Dealer 🎴 is ALWAYS assigned to the active player under 108 with the highest score at position 0!
+            String topActiveDealer = "";
             for (ItemModel item : list) {
                 if (!isPlayerOut(item)) {
-                    int amt = 0;
-                    try { amt = Integer.parseInt(item.getAmount()); } catch (Exception ignored) {}
-                    if (amt != 0) {
-                        anyNonZeroActive = true;
-                        break;
-                    }
+                    topActiveDealer = item.getName();
+                    break;
                 }
             }
 
-            if (anyNonZeroActive) {
+            if (!topActiveDealer.isEmpty()) {
+                currentDealerName = topActiveDealer;
+            } else {
                 currentDealerName = list.get(0).getName();
             }
+        } else {
+            currentDealerName = "";
         }
         adapter.setDealerName(currentDealerName);
         adapter.notifyDataSetChanged();
