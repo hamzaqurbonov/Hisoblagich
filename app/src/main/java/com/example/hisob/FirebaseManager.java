@@ -13,7 +13,11 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +35,16 @@ public class FirebaseManager {
     private static final String KEY_TEAM_NAME = "current_team_name";
     private static final String KEY_USER_NAME = "user_display_name";
     private static final String DB_URL = "https://hisoblagich-108-app-default-rtdb.firebaseio.com";
+
+    public static class SavedTeamItem {
+        public String code;
+        public String name;
+
+        public SavedTeamItem(String code, String name) {
+            this.code = code;
+            this.name = name;
+        }
+    }
 
     public interface OnTeamCreatedListener {
         void onSuccess(String teamCode, String teamName);
@@ -50,8 +64,16 @@ public class FirebaseManager {
         void onStatsLoaded(List<StatModel> statList);
     }
 
+    public interface OnCategorizedStatsDataListener {
+        void onStatsLoaded(List<StatModel> activeStats, List<StatModel> trashStats);
+    }
+
     public interface OnHistoryDataListener {
         void onHistoryLoaded(List<GameHistoryModel> historyList);
+    }
+
+    public interface OnPlayerListListener {
+        void onPlayerListLoaded(List<String> activeList, List<String> trashList);
     }
 
     private FirebaseManager(Context context) {
@@ -108,6 +130,63 @@ public class FirebaseManager {
         return prefs.getString(KEY_USER_NAME, "Иномжон");
     }
 
+    // --- Saved Teams Manager ---
+
+    public void addTeamToSavedList(String teamCode, String teamName) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        String currentSaved = prefs.getString("saved_teams_json", "");
+
+        Map<String, String> map = parseTeamsString(currentSaved);
+        map.put(teamCode, teamName != null ? teamName : "Жамоа " + teamCode);
+
+        prefs.edit().putString("saved_teams_json", serializeTeamsMap(map)).apply();
+    }
+
+    public List<SavedTeamItem> getSavedTeamsList() {
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        String currentSaved = prefs.getString("saved_teams_json", "");
+        Map<String, String> map = parseTeamsString(currentSaved);
+
+        List<SavedTeamItem> list = new ArrayList<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            list.add(new SavedTeamItem(entry.getKey(), entry.getValue()));
+        }
+        return list;
+    }
+
+    public void removeTeamFromSavedList(String teamCode) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        String currentSaved = prefs.getString("saved_teams_json", "");
+        Map<String, String> map = parseTeamsString(currentSaved);
+        map.remove(teamCode);
+        prefs.edit().putString("saved_teams_json", serializeTeamsMap(map)).apply();
+    }
+
+    private static Map<String, String> parseTeamsString(String str) {
+        Map<String, String> map = new HashMap<>();
+        if (str == null || str.trim().isEmpty()) return map;
+        String[] pairs = str.split(";");
+        for (String pair : pairs) {
+            String[] kv = pair.split("::");
+            if (kv.length == 2) {
+                map.put(kv[0], kv[1]);
+            }
+        }
+        return map;
+    }
+
+    private static String serializeTeamsMap(Map<String, String> map) {
+        if (map == null || map.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            if (sb.length() > 0) sb.append(";");
+            sb.append(entry.getKey()).append("::").append(entry.getValue());
+        }
+        return sb.toString();
+    }
+
     // --- Team Operations ---
 
     public void createTeam(String teamName, String creatorName, OnTeamCreatedListener listener) {
@@ -124,7 +203,9 @@ public class FirebaseManager {
         teamRef.setValue(teamData).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 teamRef.child("members").child(creatorName).setValue(true);
+                addPlayerToTeamList(teamCode, creatorName);
                 saveCurrentTeam(teamCode, teamName);
+                addTeamToSavedList(teamCode, teamName);
                 saveUserName(creatorName);
                 listener.onSuccess(teamCode, teamName);
             } else {
@@ -145,7 +226,9 @@ public class FirebaseManager {
                     if (teamName == null) teamName = "Жамоа " + teamCode;
 
                     teamRef.child("members").child(playerName).setValue(true);
+                    addPlayerToTeamList(teamCode, playerName);
                     saveCurrentTeam(teamCode, teamName);
+                    addTeamToSavedList(teamCode, teamName);
                     saveUserName(playerName);
                     listener.onSuccess(teamCode, teamName);
                 } else {
@@ -157,6 +240,78 @@ public class FirebaseManager {
             public void onCancelled(@NonNull DatabaseError error) {
                 listener.onError(error.getMessage());
             }
+        });
+    }
+
+    // --- Custom Team Player List Management ---
+
+    public void listenToTeamPlayerList(String teamCode, OnPlayerListListener listener) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+
+        mDatabase.child("teams").child(teamCode).child("playerList").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<String> activeList = new ArrayList<>();
+                List<String> trashList = new ArrayList<>();
+
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    String name = child.getKey();
+                    Object statusObj = child.getValue();
+                    String status = statusObj != null ? statusObj.toString() : "active";
+
+                    if (name != null) {
+                        if ("archived".equals(status)) {
+                            trashList.add(name);
+                        } else {
+                            activeList.add(name);
+                        }
+                    }
+                }
+                listener.onPlayerListLoaded(activeList, trashList);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    public void addPlayerToTeamList(String teamCode, String playerName) {
+        if (teamCode == null || teamCode.isEmpty() || playerName == null || playerName.trim().isEmpty()) return;
+        mDatabase.child("teams").child(teamCode).child("playerList").child(playerName.trim()).setValue("active");
+    }
+
+    public void deletePlayerFromTeamList(String teamCode, String playerName) {
+        if (teamCode == null || teamCode.isEmpty() || playerName == null) return;
+        // Soft delete (moves to Trash Bin, preserves stats and history!)
+        mDatabase.child("teams").child(teamCode).child("playerList").child(playerName).setValue("archived");
+    }
+
+    public void restorePlayerInTeamList(String teamCode, String playerName) {
+        if (teamCode == null || teamCode.isEmpty() || playerName == null) return;
+        mDatabase.child("teams").child(teamCode).child("playerList").child(playerName).setValue("active");
+    }
+
+    public void renamePlayerInTeam(String teamCode, String oldName, String newName) {
+        if (teamCode == null || teamCode.isEmpty() || oldName == null || newName == null) return;
+        String cleanNew = newName.trim();
+        if (cleanNew.isEmpty() || cleanNew.equals(oldName)) return;
+
+        mDatabase.child("teams").child(teamCode).child("playerList").child(oldName).removeValue();
+        mDatabase.child("teams").child(teamCode).child("playerList").child(cleanNew).setValue("active");
+
+        DatabaseReference oldStatRef = mDatabase.child("teams").child(teamCode).child("stats").child(oldName);
+        DatabaseReference newStatRef = mDatabase.child("teams").child(teamCode).child("stats").child(cleanNew);
+
+        oldStatRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    newStatRef.setValue(snapshot.getValue()).addOnCompleteListener(task -> oldStatRef.removeValue());
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
 
@@ -210,6 +365,22 @@ public class FirebaseManager {
         data.put("amountplus", "0");
         data.put("elim_order", 0);
         pRef.setValue(data);
+
+        addPlayerToTeamList(teamCode, playerName);
+    }
+
+    public void removePlayerFromGame(String teamCode, String playerName) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+        mDatabase.child("teams").child(teamCode).child("activeGame").child("players").child(playerName).removeValue();
+    }
+
+    public void resetPlayerScoreInFirebase(String teamCode, String playerName) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+        DatabaseReference pRef = mDatabase.child("teams").child(teamCode).child("activeGame").child("players").child(playerName);
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("amount", "0");
+        updates.put("amountplus", "0");
+        pRef.updateChildren(updates);
     }
 
     public void updateCourseInFirebase(String teamCode, String playerName, int addedAmount) {
@@ -272,6 +443,167 @@ public class FirebaseManager {
         mDatabase.child("teams").child(teamCode).child("activeGame").removeValue();
     }
 
+    public void finishGameAndRecordStatsInFirebase(String teamCode, List<ItemModel> currentPlayers) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+
+        DatabaseReference gameRef = mDatabase.child("teams").child(teamCode).child("activeGame").child("players");
+        gameRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<DbSQL.PlayerGameStatus> statuses = new ArrayList<>();
+                if (snapshot.exists()) {
+                    for (DataSnapshot child : snapshot.getChildren()) {
+                        String name = child.child("name").getValue(String.class);
+                        String amtStr = child.child("amount").getValue(String.class);
+                        String amtPlusStr = child.child("amountplus").getValue(String.class);
+                        Long orderVal = child.child("elim_order").getValue(Long.class);
+
+                        int amt = 0;
+                        try { amt = Integer.parseInt(amtStr); } catch (Exception ignored) {}
+                        if (amtPlusStr == null) amtPlusStr = "";
+                        int order = orderVal != null ? orderVal.intValue() : 0;
+
+                        if (name != null) {
+                            statuses.add(new DbSQL.PlayerGameStatus(name, amt, amtPlusStr, order));
+                        }
+                    }
+                }
+
+                if (statuses.isEmpty() && currentPlayers != null) {
+                    for (ItemModel item : currentPlayers) {
+                        int amt = 0;
+                        try { amt = Integer.parseInt(item.getAmount()); } catch (Exception ignored) {}
+                        String plus = item.getAmountplus() != null ? item.getAmountplus() : "";
+                        statuses.add(new DbSQL.PlayerGameStatus(item.getName(), amt, plus, 0));
+                    }
+                }
+
+                if (statuses.isEmpty()) return;
+
+                List<DbSQL.PlayerGameStatus> activePlayers = new ArrayList<>();
+                List<DbSQL.PlayerGameStatus> eliminatedPlayers = new ArrayList<>();
+
+                for (DbSQL.PlayerGameStatus p : statuses) {
+                    boolean is77 = p.amountPlus.contains("(7)");
+                    boolean isOut = (p.amount >= 108 || is77 || p.elimOrder > 0);
+                    if (!isOut) {
+                        activePlayers.add(p);
+                    } else {
+                        eliminatedPlayers.add(p);
+                    }
+                }
+
+                activePlayers.sort(Comparator.comparingInt(p -> p.amount));
+                eliminatedPlayers.sort((p1, p2) -> Integer.compare(p2.elimOrder, p1.elimOrder));
+
+                int currentRank = 1;
+                String winnerName = "Аниқланмади";
+
+                for (DbSQL.PlayerGameStatus p : activePlayers) {
+                    p.computedRank = currentRank;
+                    if (currentRank == 1) {
+                        winnerName = p.name;
+                    }
+                    currentRank++;
+                }
+
+                int lastElimOrder = -1;
+                int rankForCurrentGroup = currentRank;
+
+                for (int i = 0; i < eliminatedPlayers.size(); i++) {
+                    DbSQL.PlayerGameStatus p = eliminatedPlayers.get(i);
+                    if (i == 0) {
+                        p.computedRank = rankForCurrentGroup;
+                        lastElimOrder = p.elimOrder;
+                        if (winnerName.equals("Аниқланмади")) {
+                            winnerName = p.name;
+                        }
+                    } else {
+                        if (p.elimOrder == lastElimOrder) {
+                            p.computedRank = rankForCurrentGroup;
+                        } else {
+                            rankForCurrentGroup = currentRank;
+                            p.computedRank = rankForCurrentGroup;
+                            lastElimOrder = p.elimOrder;
+                        }
+                    }
+                    currentRank++;
+                }
+
+                // Sort statuses by computedRank ascending (1-ўрин first at top)
+                statuses.sort(Comparator.comparingInt(p -> p.computedRank));
+
+                // History details
+                String dateStr = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(new Date());
+                StringBuilder detailsBuilder = new StringBuilder();
+
+                for (DbSQL.PlayerGameStatus p : statuses) {
+                    boolean is77 = p.amountPlus.contains("(7)");
+                    boolean isOut = (p.amount >= 108 || is77 || p.elimOrder > 0);
+
+                    detailsBuilder.append(p.name).append(": ").append(p.amount);
+                    if (is77) {
+                        detailsBuilder.append(" (7)");
+                    }
+                    detailsBuilder.append(" (").append(p.computedRank).append("-ўрин)");
+                    if (isOut && !is77) detailsBuilder.append(" [Учди]");
+                    detailsBuilder.append("\n");
+                }
+
+                // Save to Firebase History
+                DatabaseReference histRef = mDatabase.child("teams").child(teamCode).child("history").push();
+                Map<String, Object> histData = new HashMap<>();
+                histData.put("dateStr", dateStr);
+                histData.put("winnerName", winnerName);
+                histData.put("details", detailsBuilder.toString().trim());
+                histRef.setValue(histData);
+
+                // Update Firebase Stats for each player
+                DatabaseReference statsRef = mDatabase.child("teams").child(teamCode).child("stats");
+
+                for (DbSQL.PlayerGameStatus p : statuses) {
+                    boolean isWin = (p.computedRank == 1);
+                    DatabaseReference pStatRef = statsRef.child(p.name);
+
+                    pStatRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snap) {
+                            int wins = getIntVal(snap.child("wins"));
+                            int losses = getIntVal(snap.child("losses"));
+                            int games = getIntVal(snap.child("games_played"));
+                            int points = getIntVal(snap.child("total_points"));
+                            int rankSum = getIntVal(snap.child("total_rank"));
+                            String oldRankCounts = snap.child("rank_counts").getValue(String.class);
+
+                            Map<Integer, Integer> rankMap = DbSQL.parseRankMap(oldRankCounts);
+                            rankMap.put(p.computedRank, rankMap.getOrDefault(p.computedRank, 0) + 1);
+                            String newRankCounts = DbSQL.serializeRankMap(rankMap);
+
+                            Map<String, Object> statUpdates = new HashMap<>();
+                            statUpdates.put("wins", isWin ? wins + 1 : wins);
+                            statUpdates.put("losses", !isWin ? losses + 1 : losses);
+                            statUpdates.put("games_played", games + 1);
+                            statUpdates.put("total_points", points + p.amount);
+                            statUpdates.put("total_rank", rankSum + p.computedRank);
+                            statUpdates.put("rank_counts", newRankCounts);
+
+                            pStatRef.updateChildren(statUpdates);
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {}
+                    });
+                }
+
+                // Clear Active Game
+                clearActiveGameInFirebase(teamCode);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
     public void incrementTeamStat(String teamCode, String playerName, String statField) {
         if (teamCode == null || teamCode.isEmpty()) return;
         DatabaseReference statRef = mDatabase.child("teams").child(teamCode).child("stats").child(playerName).child(statField);
@@ -291,6 +623,62 @@ public class FirebaseManager {
     }
 
     // --- Team Isolated Stats and History ---
+
+    public void listenToTeamStatsCategorized(String teamCode, OnCategorizedStatsDataListener listener) {
+        if (teamCode == null || teamCode.isEmpty()) return;
+
+        mDatabase.child("teams").child(teamCode).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot teamSnapshot) {
+                DataSnapshot statsSnap = teamSnapshot.child("stats");
+                DataSnapshot playerListSnap = teamSnapshot.child("playerList");
+
+                Map<String, String> playerStatusMap = new HashMap<>();
+                for (DataSnapshot pChild : playerListSnap.getChildren()) {
+                    if (pChild.getKey() != null) {
+                        Object val = pChild.getValue();
+                        playerStatusMap.put(pChild.getKey(), val != null ? val.toString() : "active");
+                    }
+                }
+
+                List<StatModel> activeStats = new ArrayList<>();
+                List<StatModel> trashStats = new ArrayList<>();
+
+                for (DataSnapshot child : statsSnap.getChildren()) {
+                    String name = child.getKey();
+                    if (name == null) continue;
+
+                    int wins = getIntVal(child.child("wins"));
+                    int losses = getIntVal(child.child("losses"));
+                    int games = getIntVal(child.child("games_played"));
+                    int times107 = getIntVal(child.child("times_107"));
+                    int times77 = getIntVal(child.child("times_77"));
+                    int totalPoints = getIntVal(child.child("total_points"));
+                    int rankSum = getIntVal(child.child("total_rank"));
+                    String rankCountsStr = child.child("rank_counts").getValue(String.class);
+
+                    Map<Integer, Integer> rankMap = DbSQL.parseRankMap(rankCountsStr);
+                    StatModel statModel = new StatModel(name, wins, losses, games, times107, times77, totalPoints, rankSum, rankMap);
+
+                    String status = playerStatusMap.getOrDefault(name, "active");
+                    if ("archived".equals(status)) {
+                        trashStats.add(statModel);
+                    } else {
+                        activeStats.add(statModel);
+                    }
+                }
+
+                // Sort stats by Wins descending (highest wins first at top)
+                activeStats.sort((s1, s2) -> Integer.compare(s2.getWins(), s1.getWins()));
+                trashStats.sort((s1, s2) -> Integer.compare(s2.getWins(), s1.getWins()));
+
+                listener.onStatsLoaded(activeStats, trashStats);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
 
     public void listenToTeamStats(String teamCode, OnStatsDataListener listener) {
         if (teamCode == null || teamCode.isEmpty()) return;
@@ -313,6 +701,10 @@ public class FirebaseManager {
                     Map<Integer, Integer> rankMap = DbSQL.parseRankMap(rankCountsStr);
                     statList.add(new StatModel(name, wins, losses, games, times107, times77, totalPoints, rankSum, rankMap));
                 }
+
+                // Sort statList by Wins descending (highest wins first at top)
+                statList.sort((s1, s2) -> Integer.compare(s2.getWins(), s1.getWins()));
+
                 listener.onStatsLoaded(statList);
             }
 
@@ -336,6 +728,7 @@ public class FirebaseManager {
 
                     list.add(new GameHistoryModel(idCounter++, dateStr != null ? dateStr : "", winnerName != null ? winnerName : "", details != null ? details : ""));
                 }
+                Collections.reverse(list); // Reverse so newest games appear FIRST at the top!
                 listener.onHistoryLoaded(list);
             }
 

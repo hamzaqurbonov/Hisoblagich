@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#FFFFFF">
+
+    <TextView
+        android:id="@+id/tvDialogTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="👥 Жамоа Ўйинчилари Базаси"
+        android:textColor="#1976D2"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Add New Player Input Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <EditText
+            android:id="@+id/etNewPlayerName"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:hint="Янги ўйинчи исми"
+            android:inputType="textPersonName"
+            android:background="@drawable/edittext_bg"
+            android:paddingHorizontal="12dp"
+            android:textColor="#111111"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnAddPlayerToList"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:text="+ Қўшиш"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#2E7D32"
+            android:textStyle="bold"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
+    <!-- Tab Toggle: Active vs Trash Bin -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <Button
+            android:id="@+id/btnViewActive"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:textSize="12dp"
+            android:text="Фаол ўйинчилар"
+            android:textColor="#1976D2"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnViewTrash"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:textSize="12dp"
+            android:text="🗑️ Корзинка"
+            android:textColor="#757575"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Master Player List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvSelectPlayers"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"
+        android:clipToPadding="false" />
+
+    <!-- Bottom Save Button -->
+    <Button
+        android:id="@+id/btnConfirmSelection"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="12dp"
+        android:text="Ўйинга Қўшиш (Сақлаш)"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#1976D2"
+        app:cornerRadius="10dp" />
+
+</LinearLayout>

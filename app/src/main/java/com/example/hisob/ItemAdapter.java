@@ -24,13 +24,21 @@ import java.util.Map;
 
 public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder> {
     private DbSQL dbSQL;
+    private FirebaseManager fbManager;
     private List<ItemModel> itemList;
     private Context context;
+    private String dealerName = "";
 
     public ItemAdapter(Context context, List<ItemModel> itemList) {
         this.context = context;
         this.itemList = itemList;
-        dbSQL = new DbSQL(context);
+        this.dbSQL = new DbSQL(context);
+        this.fbManager = FirebaseManager.getInstance(context);
+    }
+
+    public void setDealerName(String dealerName) {
+        this.dealerName = dealerName != null ? dealerName : "";
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -45,8 +53,18 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
     public void onBindViewHolder(@NonNull ItemViewHolder holder, int position) {
         ItemModel item = itemList.get(position);
 
+        if (holder.currentWatcher != null) {
+            holder.etNumber.removeTextChangedListener(holder.currentWatcher);
+        }
+
         holder.etNumber.setVisibility(View.VISIBLE);
-        holder.tvName.setText(item.getName());
+
+        if (item.getName().equals(dealerName)) {
+            holder.tvName.setText("🎴 " + item.getName());
+        } else {
+            holder.tvName.setText(item.getName());
+        }
+
         holder.etNumber.setText("");
 
         int amount = 0;
@@ -61,39 +79,56 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         holder.tvHistory.setText("Тарих: " + amountPlusStr);
 
         boolean is77Out = amountPlusStr.contains("(7)");
+        String teamCode = fbManager.getCurrentTeamCode();
 
         // Styling based on score rules
         if (is77Out) {
             holder.etNumber.setVisibility(View.GONE);
-            holder.tvBadge.setText("УЧДИ! (7)");
+            holder.tvBadge.setText("Кетди! (7)");
             holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
             holder.tvBadge.setTextColor(Color.parseColor("#C62828"));
         } else if (amount == 107) {
-            holder.tvBadge.setText("Омадли 107! (0 балл)");
+            holder.tvBadge.setText("Омадли 107! (0 Ҳисоб)");
             holder.tvBadge.setBackgroundColor(Color.parseColor("#FFF8E1"));
             holder.tvBadge.setTextColor(Color.parseColor("#F57F17"));
-            dbSQL.updateNull(String.valueOf(item.getId()), "0", "0");
+
+            if (!teamCode.isEmpty()) {
+                fbManager.resetPlayerScoreInFirebase(teamCode, item.getName());
+            } else {
+                dbSQL.updateNull(String.valueOf(item.getId()), "0", "0");
+            }
         } else if (amount >= 108) {
             holder.etNumber.setVisibility(View.GONE);
-            holder.tvBadge.setText("УЧДИ! (" + amount + ")");
+            holder.tvBadge.setText("Кетди! (" + amount + ")");
             holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
             holder.tvBadge.setTextColor(Color.parseColor("#C62828"));
         } else if (amount >= 100) {
-            holder.tvBadge.setText(amount + " балл (Хавфли!)");
+            holder.tvBadge.setText(amount + " ҳисоб (Хавфли!)");
             holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
             holder.tvBadge.setTextColor(Color.parseColor("#D32F2F"));
         } else if (amount <= 40) {
-            holder.tvBadge.setText(amount + " балл");
+            holder.tvBadge.setText(amount + " ҳисоб");
             holder.tvBadge.setBackgroundColor(Color.parseColor("#E3F2FD"));
             holder.tvBadge.setTextColor(Color.parseColor("#1976D2"));
         } else {
-            holder.tvBadge.setText(amount + " балл");
+            holder.tvBadge.setText(amount + " ҳисоб");
             holder.tvBadge.setBackgroundColor(Color.parseColor("#E8F5E9"));
             holder.tvBadge.setTextColor(Color.parseColor("#2E7D32"));
         }
 
+        // Filter numbers (max 5 chars)
+        holder.etNumber.setFilters(new InputFilter[]{
+                new InputFilter.LengthFilter(5),
+                (source, start, end, dest, dstart, dend) -> {
+                    if (source.toString().matches("^-?\\d*$")) {
+                        return null;
+                    }
+                    return "";
+                }
+        });
+
         // Input listener
-        holder.etNumber.addTextChangedListener(new TextWatcher() {
+        TextWatcher watcher = new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
@@ -108,7 +143,7 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
                     item.setTemporaryAmount(inputNumber);
 
                     if (inputNumber == -77) {
-                        holder.tvBadge.setText("УЧДИ! (7)");
+                        holder.tvBadge.setText("Сизга ўйин тугади! (7)");
                         holder.tvBadge.setBackgroundColor(Color.parseColor("#FFEBEE"));
                         holder.tvBadge.setTextColor(Color.parseColor("#C62828"));
                     }
@@ -116,17 +151,10 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
                     item.setTemporaryAmount(0);
                 }
             }
-        });
+        };
 
-        // Filter numbers
-        holder.etNumber.setFilters(new InputFilter[]{
-                (source, start, end, dest, dstart, dend) -> {
-                    if (source.toString().matches("^-?\\d*$")) {
-                        return null;
-                    }
-                    return "";
-                }
-        });
+        holder.currentWatcher = watcher;
+        holder.etNumber.addTextChangedListener(watcher);
 
         // Delete single player
         holder.btnDelete.setOnClickListener(v -> {
@@ -134,8 +162,12 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
                     .setTitle("Ўчириш")
                     .setMessage(item.getName() + " ни ўйиндан ўчиришга ишончингиз комилми?")
                     .setPositiveButton("Ҳа", (dialog, which) -> {
-                        dbSQL.deleteSelect(String.valueOf(item.getId()));
-                        Refresh(dbSQL.readCourses());
+                        if (!teamCode.isEmpty()) {
+                            fbManager.removePlayerFromGame(teamCode, item.getName());
+                        } else {
+                            dbSQL.deleteSelect(String.valueOf(item.getId()));
+                            Refresh(dbSQL.readCourses());
+                        }
                     })
                     .setNegativeButton("Йўқ", null)
                     .show();
@@ -181,6 +213,7 @@ public class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ItemViewHolder
         TextView tvName, tvBadge, tvHistory;
         EditText etNumber;
         ImageView btnDelete;
+        TextWatcher currentWatcher;
 
         public ItemViewHolder(@NonNull View itemView) {
             super(itemView);

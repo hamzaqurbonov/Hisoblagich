@@ -38,6 +38,31 @@
         android:layout_marginBottom="16dp"
         android:textColor="#111111"/>
 
+    <!-- Section 0: Saved Teams List -->
+    <LinearLayout
+        android:id="@+id/layoutSavedTeamsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📚 Мавжуд Сақланган Жамоаларим"
+            android:textColor="#1976D2"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvSavedTeams"
+            android:layout_width="match_parent"
+            android:layout_height="140dp"
+            android:clipToPadding="false"/>
+    </LinearLayout>
+
     <!-- Section 1: Create Team -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
